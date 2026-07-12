@@ -1,0 +1,18 @@
+[project]
+name = "societies-of-thought"
+version = "0.1.0"
+description = "Does conversational SAE-feature steering improve reasoning off Countdown? (probe of arXiv 2601.10825)"
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.4",
+    "transformers>=4.44",
+    "accelerate>=0.33",
+    "safetensors>=0.4",
+    "huggingface-hub>=0.24",
+    "datasets>=2.20",
+    "numpy>=1.26",
+    "math-verify>=0.5",
+]
+
+[tool.setuptools.packages.find]
+include = ["sot*"]
