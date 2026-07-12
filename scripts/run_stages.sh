@@ -26,6 +26,16 @@ hook)
   ;;
 
 # ---------------------------------------------------------------------------
+# Stage 0b. Calibrate feature activation scales in OUR units.
+# Neuronpedia's published max activations are on a different scale than the SAE's
+# (~3.2x here). Steering strength is a multiple of max activation, so using their
+# number would make every intervention ~3x weaker than intended -- silently.
+# ---------------------------------------------------------------------------
+calibrate)
+  python -m sot.calibrate --layer 15 --mixture slimpj --n-docs 2000
+  ;;
+
+# ---------------------------------------------------------------------------
 # Stage 1. POSITIVE CONTROL: reproduce the paper on its own task.
 # Target: 27.1% at s=0 -> 54.8% at s=+10 on Countdown, feature 30939.
 # Uses the paper's raw strengths, not our alpha units, so the numbers are
@@ -88,13 +98,14 @@ smoke)
   ;;
 
 *)
-  echo "usage: $0 {hook|control|main|layers|smoke}"
+  echo "usage: $0 {hook|calibrate|smoke|control|main|layers}"
   echo
-  echo "  hook     resolve the resid_pre/resid_post ambiguity   (required first)"
-  echo "  smoke    8-problem wiring check"
-  echo "  control  reproduce the paper on Countdown             (gate)"
-  echo "  main     GPQA + MATH-Hard steering sweep              (the experiment)"
-  echo "  layers   layer sweep, only if 'main' shows an effect"
+  echo "  hook      resolve the resid_pre/resid_post ambiguity  (required first)"
+  echo "  calibrate measure feature max-acts in our units       (required second)"
+  echo "  smoke     8-problem wiring check"
+  echo "  control   reproduce the paper on Countdown            (gate)"
+  echo "  main      GPQA + MATH-Hard steering sweep             (the experiment)"
+  echo "  layers    layer sweep, only if 'main' shows an effect"
   exit 1
   ;;
 esac

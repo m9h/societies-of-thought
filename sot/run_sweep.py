@@ -108,6 +108,7 @@ def main() -> None:
         sae = load_sae(layer, args.mixture, device=device)
         source = neuronpedia_source_id(layer, args.mixture)
         feats = load_features(source, args.cache)
+        _apply_calibration(feats, layer, args.mixture)
 
         if args.features:
             chosen = [feats[i] for i in args.features]
@@ -259,6 +260,35 @@ def _resolve_hook(path: Path) -> int:
     offset = info["hook_layer"] - info["layer"]
     print(f"hook point: {info['hook_point']} (offset {offset:+d} from SAE layer)")
     return offset
+
+
+def _apply_calibration(feats: dict[int, Feature], layer: int, mixture: str) -> None:
+    """Replace Neuronpedia's max activations with ones measured in our own units.
+
+    Neuronpedia's activation scale differs from the SAE's by a constant factor
+    (~3.2x here). Feature SELECTION is unaffected -- it only compares features to
+    each other, and the factor is common to all of them. But steering STRENGTH is
+    absolute: alpha is a multiple of max activation, and using Neuronpedia's number
+    would make every intervention ~3x weaker than intended, with nothing to signal
+    that anything went wrong.
+    """
+    path = Path(f"results/feature_stats_L{layer}_{mixture}.json")
+    if not path.exists():
+        raise SystemExit(
+            f"missing {path}. Run:\n"
+            f"  python -m sot.calibrate --layer {layer} --mixture {mixture}\n"
+            "It measures each feature's max activation in the same units the steering "
+            "hook uses. Neuronpedia's published values are on a different scale and "
+            "would silently mis-size every intervention."
+        )
+    stats = json.loads(path.read_text())
+    max_act = stats["max_act"]
+    frac = stats["frac_nonzero"]
+    for i, f in feats.items():
+        if i < len(max_act):
+            f.max_act = float(max_act[i])
+            f.frac_nonzero = float(frac[i])
+    print(f"calibrated max activations from {path} ({stats['n_tokens']} tokens)")
 
 
 def _layer_anchor(feats: dict[int, Feature]) -> int:

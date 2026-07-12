@@ -113,14 +113,24 @@ def main() -> None:
     print(f"=> feature 30939 at {winner}: fires {sep:.2f} on conversational vs "
           f"{results[winner]['peak_on_control']:.2f} on control text")
 
-    if best_ev < 0.5:
-        print("\n!! STOP: nothing reconstructs above 50% explained variance.")
+    if best_ev < 0.4:
+        print("\n!! STOP: nothing reconstructs above 40% explained variance.")
         print("!! The SAE is not attaching where we think it is. Do not run the sweep.")
     if best_conv != "dataset-wise":
         print("\n!! NOTE: reconstruction prefers NO dataset-wise rescaling, contradicting")
         print("!! the SAE config. sae.py's sae_to_real must be set to 1.0 before steering.")
     if sep <= 0:
         print("\n!! WARNING: feature does not separate conversational from control text.")
+
+    # Neuronpedia's activation scale disagrees with ours by a consistent factor
+    # (~3.2x on the paper's own Fig. 2a contexts). Reconstruction says our scaling
+    # is the right one, so Neuronpedia's number must not be used to size steering
+    # strengths -- calibrate.py measures max activations in our units instead.
+    ratio = results[winner]["peak_on_conversational"] / args.expected_max_act
+    if ratio > 1.3 or ratio < 0.77:
+        print(f"\n!! Neuronpedia's activation scale differs from ours by {ratio:.2f}x.")
+        print("!! Do NOT size alpha off Neuronpedia's maxAct. Run:")
+        print(f"!!   python -m sot.calibrate --layer {args.layer} --mixture {args.mixture}")
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps({

@@ -41,44 +41,69 @@ The estimand is a difference-in-differences, not a raw effect:
 If that is ≈ 0, the *society-of-thought* mechanism is not what's doing the work —
 however large the raw steering effect looks.
 
-## Two traps this code is built around
+## Four traps, and how they were resolved
 
-**1. The SAE lives in a rescaled space.** These SAEs are trained with
-`norm_activation: dataset-wise`: they never saw the raw residual stream, only
-activations rescaled so the dataset-average norm maps to `sqrt(d_model)`. Decoder
-columns, feature activations, and Neuronpedia's reported max-activations are all
-in *that* space. Steering strengths must be converted back exactly once
-(`sae.steering_vector`). Getting it backwards rescales every intervention by
-~an order of magnitude and still "works" — it just isn't the experiment you meant
-to run.
+Every one of these produces plausible-looking numbers and a *different experiment*
+than the one you meant to run. None throws an error. They were found by demanding
+that the SAE **reconstruct** the residual stream — its own training objective, and
+the only ground truth here that doesn't depend on trusting published metadata.
 
-**2. The published metadata contradicts itself about where the SAE attaches.**
-The SAE's own `config.json` says `blocks.15.hook_resid_post`. Neuronpedia's
-feature metadata for the *same SAE* says `blocks.15.hook_resid_pre`. Those are
-different tensors, one layer apart. `sot/validate_hook.py` settles it empirically —
-it encodes both candidate sites and keeps whichever reproduces feature 30939's
-published behaviour (fires on "Oh!"-type surprise markers, max activation ≈ 5.906).
-**The sweep refuses to run until this is resolved.**
+**1. The published metadata names the wrong hook point.** The SAE's `config.json`
+says `blocks.15.hook_resid_post`; Neuronpedia's metadata for the *same SAE* says
+`blocks.15.hook_resid_pre`. Those are different tensors, one layer apart.
+Reconstruction settles it: `resid_post` gives **52.5%** explained variance,
+`resid_pre` **27.5%**. The config is right; **Neuronpedia is mislabeled.**
 
-## Strength units
+**2. BOS is an attention sink.** Its residual norm here is **466** against ~11 for
+every ordinary token. The SAE was never trained to model it, and leaving it in
+makes reconstruction error ~25× the variance *at every hook point and every
+scaling* — which looks exactly like "the whole setup is broken." Excluded
+everywhere.
 
-The paper steers at `s = ±10`. Feature 30939's max activation is 5.906, so the
-paper's `+10` is ≈ **1.7× max-act**. Raw `s` is meaningless across features whose
-activation scales differ by orders of magnitude, so the sweep parameterizes
-strength as `alpha` = multiples of each feature's own max activation
-(`--alphas -2 -1 1 2`). `--raw-strengths` reproduces the paper's exact units for
-the Countdown control.
+**3. The activation function is JumpReLU, not ReLU.** Features fire only above a
+per-feature threshold (`log_jumprelu_threshold`). A plain ReLU keeps thousands of
+sub-threshold activations alive; each is individually negligible, but they all get
+multiplied by decoder columns and summed, and the reconstruction acquires a large
+amount of spurious mass.
+
+**4. The SAE lives in a rescaled space.** `norm_activation: dataset-wise` — the SAE
+saw activations rescaled so the dataset-average norm maps to `sqrt(d_model)`.
+Confirmed empirically: the stored `dataset_avg_norm` is 11.575 and the measured
+mean residual norm is 11.0–12.1. Steering vectors must be converted back to real
+space exactly once (`sae.steering_vector`).
+
+## Strength units, and why Neuronpedia's numbers can't set them
+
+Raw `s` is meaningless across features whose activation scales differ by orders of
+magnitude, so strength is parameterized as `alpha` = multiples of a feature's own
+max activation.
+
+But **max activation must be measured in our units.** At the verified hook point,
+feature 30939 peaks at **18.4** on the very contexts the paper's Fig. 2a prints as
+5.78 / 5.75 / 4.75 — a consistent **~3.1×** offset. Reconstruction says our scaling
+is the correct one, so Neuronpedia's displayed activations simply live on a
+different scale. Sizing `alpha` off their number would make every intervention ~3×
+weaker than intended, silently. `sot/calibrate.py` therefore measures max
+activations directly over SlimPajama (the SAE's own training corpus), and the sweep
+refuses to run without it.
+
+Feature *selection* is unaffected by this — it only compares features to each
+other, and the offset is common to all of them.
+
+For the Countdown positive control, `--raw-strengths` reproduces the paper's exact
+`s = ±10` units so the numbers are directly comparable.
 
 ## Running it
 
 ```bash
-./scripts/setup.sh              # uv venv + torch (cu130) + deps
+./scripts/setup.sh                  # uv venv + torch (cu130) + deps
 
-./scripts/run_stages.sh hook     # REQUIRED. resolve resid_pre vs resid_post
-./scripts/run_stages.sh smoke    # 8 problems, end-to-end wiring check
-./scripts/run_stages.sh control  # GATE: reproduce 27.1% -> 54.8% on Countdown
-./scripts/run_stages.sh main     # THE EXPERIMENT: GPQA + MATH-Hard
-./scripts/run_stages.sh layers   # layer sweep (only if `main` shows an effect)
+./scripts/run_stages.sh hook        # REQUIRED. resolve the hook point by reconstruction
+./scripts/run_stages.sh calibrate   # REQUIRED. measure max-acts in our units
+./scripts/run_stages.sh smoke       # 8 problems, end-to-end wiring check
+./scripts/run_stages.sh control     # GATE: reproduce 27.1% -> 54.8% on Countdown
+./scripts/run_stages.sh main        # THE EXPERIMENT: GPQA + MATH-Hard
+./scripts/run_stages.sh layers      # layer sweep (only if `main` shows an effect)
 ```
 
 Stages are gates. **If `control` does not roughly reproduce the paper's Countdown
