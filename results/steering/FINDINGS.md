@@ -167,7 +167,59 @@ without the accuracy.
   inverted-U collapses into degenerate babble (3.5%, 96% unparseable) at the paper's own
   upper dose. In their terms, this society is not robust.
 
-## 7. Limitations (ours, and the field's)
+## 7. Hierarchic Social Entropy: diversity is a correlate, not a lever
+
+We applied Huot et al.'s judge-free diversity measure to the Countdown dose ladder (1,200
+saved traces). Each trace is segmented at the paper's *own* perspective-shift cues
+(wait / but / however / actually / ...), the segments are embedded locally, and Balch's HSE
+is integrated from the single-linkage dendrogram. No LLM-judge anywhere — unlike the paper's
+"perspective diversity", which is an LLM that infers the personas it then scores.
+
+Steering strength `α` in multiples of calibrated max-activation. `analysis/hse.py`, 8 tests.
+
+| α | segments/trace | HSE/log₂N | mean dist | accuracy |
+|---|---|---|---|---|
+| 0 (baseline) | 21.4 | **0.236** | 0.320 | 15.2% |
+| 0.5 | 29.5 | 0.212 | 0.332 | 28.5% |
+| 1.0 | 44.6 | 0.190 | 0.340 | 31.5% |
+| 1.693 | 54.7 | **0.190** | 0.360 | 3.6% |
+
+**Two findings, and they pull apart the paper's claim precisely.**
+
+**(a) Steering makes the society bigger and proportionally MORE REDUNDANT.** Segment count
+more than doubles (+155% at α=1.693), but **normalised diversity FALLS 20%** (0.236 → 0.190).
+Each added "voice" contributes less distinct information. This is Huot et al.'s *redundant
+society* — many actors, little differentiation — induced on demand. (Raw mean-distance does
+rise, but that is a trap: it peaks at α=1.693, the degenerate 3.6%-accuracy dose, where the
+model emits `"wait, no, wait, no, wait"`. Incoherent text embeds far apart because it is
+noise, not because it holds distinct viewpoints. Diversity of noise is not diversity of
+thought.)
+
+**(b) The mediation the paper asserts is real — but steering does not deliver it.** The
+paper's actual claim is that diversity *mediates* accuracy. That predicts a *within-condition*
+relationship: holding the intervention fixed, the more-diverse traces should be the correct
+ones. They are:
+
+| α | more-diverse → correct | 95% CI |
+|---|---|---|
+| 0 (baseline) | **+0.072** | [+0.029, +0.113] ✱ |
+| 0.678 | **+0.045** | [+0.019, +0.072] ✱ |
+| 1.0 | **+0.063** | [+0.041, +0.085] ✱ |
+| 1.693 | +0.029 | [−0.029, +0.082] |
+
+So genuine reasoning diversity *is* associated with getting the answer right — even in the
+unsteered model. The paper found a real correlation. **What it got wrong is that steering the
+conversational feature buys that diversity.** It doesn't: it buys redundancy, then noise.
+And at the degenerate dose the mediation link vanishes entirely (CI spans zero) — the
+clearest sign that what steering maximises is incoherence, not viewpoint.
+
+**The synthesis.** Diversity of *authentic* reasoning correlates with success. The paper
+mistook that correlation for a lever, and pulling the lever produces the *form* of diversity
+without the substance — which is exactly why accuracy falls (§3–4) while the dialogic markers
+rise. This is the within-model instance of Huot et al.'s between-model result: a society can
+look richer while being emptier.
+
+## 8. Limitations (ours, and the field's)
 
 - **The model is not actually a reasoning model.** `DeepSeek-R1-Distill-Llama-8B` was
   never RL'd; it is Llama-3.1-8B *supervised-fine-tuned to imitate* R1's outputs. The
@@ -179,7 +231,7 @@ without the accuracy.
 - GPQA arm truncation-limited (see above).
 - Our claim is scoped exactly as the paper's is: within this model, on these benchmarks.
 
-## 8. A correction to the public record
+## 9. A correction to the public record
 
 Neuronpedia lists this SAE's hook point as **`blocks.15.hook_resid_pre`**. The SAE's own
 config says **`resid_post`**, and reconstruction settles it decisively (52.5% vs 27.5%
