@@ -42,15 +42,50 @@ calibrate)
 # directly comparable. If this does not roughly reproduce, the harness is wrong
 # and every later result is uninterpretable. ~5k generations.
 # ---------------------------------------------------------------------------
+#
+# NOTE ON UNITS. The paper steers at s = +-10 in Neuronpedia's activation scale,
+# where feature 30939's max activation is 5.906 -- so the paper's +10 is
+# 10 / 5.906 = 1.693 x max-act. Our calibration measures that feature's max
+# activation as 14.754 in the SAE's own units. Passing --raw-strengths 10 here
+# would therefore be a ~2.5x WEAKER intervention than the paper's, not an equal
+# one. Expressing the ladder in alpha (multiples of max-act) makes it equivalent.
+#   paper s=+-10 -> alpha +-1.693     paper s=+-5 -> alpha +-0.847
 control)
   python -m sot.run_sweep \
     --tasks countdown --layers 15 --mixture slimpj \
     --features 30939 \
-    --raw-strengths -10 -5 5 10 \
+    --alphas -1.693 -0.847 0.847 1.693 \
     --n-problems 1024 --max-new-tokens 1024 \
     --batch-size 32 --save-traces \
     --out results/stage1_countdown_control.jsonl
   python -m sot.analyze --results results/stage1_countdown_control.jsonl
+  ;;
+
+# ---------------------------------------------------------------------------
+# Stage 1b. THE FAITHFUL REPLICATION, at the paper's own sample size.
+#
+# The dose ladder above already CONTAINS the paper's protocol -- because s=+-10 is
+# unit-ambiguous, both readings land on it:
+#     s=10 in SAE-native units   -> alpha = 10/14.777 = 0.677
+#     s=10 in Neuronpedia units  -> alpha = 10/5.906  = 1.693
+# What the ladder lacked was the paper's N. They used 1,024 Countdown problems; the
+# ladder used 200, which is why the best effect (+7 pts at alpha=0.5) came back with a
+# CI grazing zero. This stage runs the decisive doses at full N so the result is either
+# firm or dead, and so the writeup can state plainly: "at the paper's own settings and
+# sample size, we measured X."
+# ---------------------------------------------------------------------------
+replicate)
+  python -m sot.run_sweep \
+    --tasks countdown --layers 15 --mixture slimpj \
+    --features 30939 \
+    --alphas 0.5 0.677 1.693 \
+    --scope generated \
+    --n-problems 1024 --max-new-tokens 4096 --batch-size 24 \
+    --save-traces \
+    --out results/replicate_n1024.jsonl
+  python -m sot.regrade --results results/replicate_n1024.jsonl \
+    --out results/replicate_n1024_rg.jsonl
+  python -m sot.analyze --results results/replicate_n1024_rg.jsonl
   ;;
 
 # ---------------------------------------------------------------------------
@@ -98,12 +133,13 @@ smoke)
   ;;
 
 *)
-  echo "usage: $0 {hook|calibrate|smoke|control|main|layers}"
+  echo "usage: $0 {hook|calibrate|smoke|control|replicate|main|layers}"
   echo
   echo "  hook      resolve the resid_pre/resid_post ambiguity  (required first)"
   echo "  calibrate measure feature max-acts in our units       (required second)"
   echo "  smoke     8-problem wiring check"
   echo "  control   reproduce the paper on Countdown            (gate)"
+  echo "  replicate paper's settings at their N=1024           (the headline number)"
   echo "  main      GPQA + MATH-Hard steering sweep             (the experiment)"
   echo "  layers    layer sweep, only if 'main' shows an effect"
   exit 1

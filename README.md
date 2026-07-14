@@ -1,164 +1,167 @@
-# Does conversational-feature steering survive off Countdown?
+# Does reasoning work by simulating a "society of thought"?
 
-A probe of the causal claim in **"Reasoning Models Generate Societies of Thought"**
-(Kim, Lai, Scherrer, Agüera y Arcas & Evans, [arXiv:2601.10825](https://arxiv.org/abs/2601.10825)).
+A replication and stress-test of **"Reasoning Models Generate Societies of Thought"**
+(Kim, Lai, Scherrer, Agüera y Arcas & Evans, Google / UChicago / Santa Fe Institute,
+[arXiv:2601.10825](https://arxiv.org/abs/2601.10825), Jan 2026).
 
-## The claim under test
+The paper ships **no code and no data**. Everything here is rebuilt from public artifacts.
 
-The paper's mechanistic centerpiece: steering a single sparse-autoencoder feature
-in DeepSeek-R1-Distill-Llama-8B — feature **30939**, layer 15, "a discourse marker
-for surprise, realization, or acknowledgment" — **doubles reasoning accuracy on
-Countdown, 27.1% → 54.8%**, and suppressing it drops accuracy to 23.8%. The paper
-reads this as evidence that reasoning models work by simulating a *society of
-thought*: internal voices that question, disagree, and reconcile.
+---
 
-That is a large claim resting on a narrow base: **one hand-picked feature, at one
-layer, in one 8B distilled model, on one task.** And Countdown is a peculiar task
-to hang it on. It is a search puzzle with a weak baseline and enormous headroom,
-where the winning strategy is to enumerate more candidate expressions before
-committing. "Perturb the residual stream and the model tries more things" would
-produce the same result with no society of thought anywhere in the story.
+## The claim we're testing
 
-So this repo runs the experiment the authors didn't:
+When a reasoning model like DeepSeek-R1 "thinks", its chain of thought reads like a
+*conversation* — it asks itself questions, changes its mind, argues, and reconciles.
+Instruction-tuned models (the same base model, different post-training) don't do this;
+they produce one-sided monologue.
 
-1. **Off Countdown.** GPQA-Diamond and MATH Level-5 — both from the paper's own
-   benchmark suite, neither with Countdown's headroom, neither rewarding blind
-   enumeration.
-2. **Beyond one feature.** Conversational candidates selected two independent
-   ways, against controls **matched on sparsity and activation magnitude** — so
-   the controls differ from the candidates in *meaning*, not in how big or how
-   rare the perturbation is. The paper's controls were not matched this way, which
-   leaves "bigger perturbation" as an unexcluded explanation.
-3. **Beyond one layer.** All 32 layers have published SAEs.
+The paper says this dialogue **is the mechanism**: reasoning works *because* the model
+simulates diverse internal voices that debate. Its evidence comes in two parts.
 
-The estimand is a difference-in-differences, not a raw effect:
+**Part A — descriptive (we don't dispute this).** Across 8,262 problems, R1's traces
+contain far more question-asking, perspective-shifting, and disagreement than V3's, even
+controlling for how long the traces are. The effect is large and holds at every model size.
 
-```
-  (steered − baseline | conversational feature)
-− (steered − baseline | matched control feature)
-```
+**Part B — causal (this is what we test).** They find a single feature inside the model
+that fires on conversational surprise markers — the "Oh!" feature — and *turn it up*.
+Accuracy on a puzzle task **doubles**, 27.1% → 54.8%. They read this as: induce more
+society-of-thought, get more reasoning.
 
-If that is ≈ 0, the *society-of-thought* mechanism is not what's doing the work —
-however large the raw steering effect looks.
+**The gap:** Part B was only ever run on **one task** — Countdown, an arithmetic puzzle.
+The benchmarks that make it look like a general result (GPQA, MATH) were only *observed*,
+never intervened on.
 
-## Four traps, and how they were resolved
+---
 
-Every one of these produces plausible-looking numbers and a *different experiment*
-than the one you meant to run. None throws an error. They were found by demanding
-that the SAE **reconstruct** the residual stream — its own training objective, and
-the only ground truth here that doesn't depend on trusting published metadata.
+## What we did
 
-**1. The published metadata names the wrong hook point.** The SAE's `config.json`
-says `blocks.15.hook_resid_post`; Neuronpedia's metadata for the *same SAE* says
-`blocks.15.hook_resid_pre`. Those are different tensors, one layer apart.
-Reconstruction settles it: `resid_post` gives **52.5%** explained variance,
-`resid_pre` **27.5%**. The config is right; **Neuronpedia is mislabeled.**
+### Experiment 1 — Steering (the main result). ✅ Complete
 
-**2. BOS is an attention sink.** Its residual norm here is **466** against ~11 for
-every ordinary token. The SAE was never trained to model it, and leaving it in
-makes reconstruction error ~25× the variance *at every hook point and every
-scaling* — which looks exactly like "the whole setup is broken." Excluded
-everywhere.
+Turn the "Oh!" feature up and down inside DeepSeek-R1-Distill-Llama-8B and measure
+accuracy. Three things the paper didn't do:
 
-**3. The activation function is JumpReLU, not ReLU.** Features fire only above a
-per-feature threshold (`log_jumprelu_threshold`). A plain ReLU keeps thousands of
-sub-threshold activations alive; each is individually negligible, but they all get
-multiplied by decoder columns and summed, and the reconstruction acquires a large
-amount of spurious mass.
+1. **Sweep the strength** instead of using one setting. (The paper's setting is
+   ambiguous enough to mean two different doses; both are on our ladder.)
+2. **Run it on the paper's own benchmarks** — GPQA-Diamond and MATH-Hard — not just
+   Countdown.
+3. **Compare against matched control features.** The paper's controls weren't matched on
+   how often a feature fires or how strongly, so "this is just a bigger poke" was never
+   ruled out. Ours are matched on both.
 
-**4. The SAE lives in a rescaled space.** `norm_activation: dataset-wise` — the SAE
-saw activations rescaled so the dataset-average norm maps to `sqrt(d_model)`.
-Confirmed empirically: the stored `dataset_avg_norm` is 11.575 and the measured
-mean residual norm is 11.0–12.1. Steering vectors must be converted back to real
-space exactly once (`sae.steering_vector`).
+**Result: the effect is a Countdown artifact.**
 
-## Strength units, and why Neuronpedia's numbers can't set them
+| | Countdown (paper's task) | MATH-Hard (paper's benchmark) |
+|---|---|---|
+| baseline | 24.0% *(paper: 27.1% — we reproduce)* | 62.0% |
+| the paper's feature, turned up | **+10.0 pts** | **−22.0 pts** |
 
-Raw `s` is meaningless across features whose activation scales differ by orders of
-magnitude, so strength is parameterized as `alpha` = multiples of a feature's own
-max activation.
+The same feature, at the same strength, **helps on Countdown and wrecks MATH**. Turn it up
+further and the model degenerates into literal babble (*"cyclochoh! Wait, no, wait, no,
+wait..."*).
 
-But **max activation must be measured in our units.** At the verified hook point,
-feature 30939 peaks at **18.4** on the very contexts the paper's Fig. 2a prints as
-5.78 / 5.75 / 4.75 — a consistent **~3.1×** offset. Reconstruction says our scaling
-is the correct one, so Neuronpedia's displayed activations simply live on a
-different scale. Sizing `alpha` off their number would make every intervention ~3×
-weaker than intended, silently. `sot/calibrate.py` therefore measures max
-activations directly over SlimPajama (the SAE's own training corpus), and the sweep
-refuses to run without it.
+And the paper's own mechanism story fails: steering **does** make the traces more dialogic
+(self-interruptions +36%, contradictions and questions up) — and accuracy falls anyway.
+**You can induce the society of thought and get a dumber model.**
 
-Feature *selection* is unaffected by this — it only compares features to each
-other, and the offset is common to all of them.
+Why? Countdown is a *search* puzzle — combine 3–4 numbers to hit a target. The way to win
+is to try more candidate expressions. On a task like that, "poke the model into trying more
+things" and "make the model reason better" are indistinguishable. On MATH you can't
+brute-force your way to the answer, and the poke just makes it ramble.
 
-For the Countdown positive control, `--raw-strengths` reproduces the paper's exact
-`s = ±10` units so the numbers are directly comparable.
+→ **[Full findings, with all the numbers](results/steering/FINDINGS.md)**
+
+### Experiment 2 — Reinforcement learning (Claim B). 🔄 In progress
+
+The other half of the paper, and the only part that touches *real* RL rather than a
+pre-trained model. Take a base model (Qwen-2.5-3B), fine-tune it two ways over **identical
+problems with identical correct answers**:
+
+- **dialogue** — traces written as several experts talking it through
+- **monologue** — the same solutions, written as one voice
+
+Then run identical RL on both. The paper says the dialogue-primed model learns faster. If
+true, the social account survives our steering result — the mechanism would be real but
+*mislocated*: it emerges in training rather than living in a steerable feature.
+
+We also do what the paper didn't: **≥3 random seeds per arm.** Their headline is an
+early-training gap, which is exactly where seed noise is largest, and they appear to report
+single runs.
+
+---
+
+## The bugs worth knowing about
+
+Six silent failures, none of which raised an error, each of which would have produced a
+confident wrong answer. They're documented because **anyone replicating this paper will hit
+them**:
+
+1. **Neuronpedia lists the wrong hook point** for this SAE (`resid_pre`; it's actually
+   `resid_post`). Replicate from the published metadata and you steer the wrong layer.
+2. **The first token is an attention sink** (norm 466 vs 11 for everything else). Include
+   it and every measurement is garbage.
+3. **The activation function is JumpReLU, not ReLU.**
+4. **Neuronpedia's activation scale is ~2.5× off the SAE's own** — size your steering from
+   it and every intervention is 2.5× too weak.
+5. **The model answers in LaTeX `\boxed{}`, not the `<answer>` tag the prompt demands.**
+   Grading only the tag scored 74% of *correct* traces as unparseable and put our baseline
+   at 5.5% instead of 24% — which looks exactly like "the paper doesn't reproduce."
+6. **`truncated` measured the padded batch, not the sequence** — 96% "truncation" that was
+   really 12%.
+
+The lesson, and the reason for the test suite: *an unparseable answer must score **wrong**,
+never be dropped.* Otherwise a degenerating model "improves" by shrinking its own
+denominator.
+
+---
 
 ## Running it
 
 ```bash
-./scripts/setup.sh                  # uv venv + torch (cu130) + deps
+./scripts/setup.sh                  # uv venv + torch + deps
 
-./scripts/run_stages.sh hook        # REQUIRED. resolve the hook point by reconstruction
-./scripts/run_stages.sh calibrate   # REQUIRED. measure max-acts in our units
-./scripts/run_stages.sh smoke       # 8 problems, end-to-end wiring check
-./scripts/run_stages.sh control     # GATE: reproduce 27.1% -> 54.8% on Countdown
-./scripts/run_stages.sh main        # THE EXPERIMENT: GPQA + MATH-Hard
-./scripts/run_stages.sh layers      # layer sweep (only if `main` shows an effect)
+./scripts/run_stages.sh hook        # REQUIRED: resolve the hook point by reconstruction
+./scripts/run_stages.sh calibrate   # REQUIRED: measure activation scales in OUR units
+./scripts/run_stages.sh control     # the Countdown dose-response
+./scripts/run_stages.sh main        # GPQA + MATH-Hard with matched controls
+
+python -m rl.generate_sft           # dialogue/monologue SFT data (verified, matched)
+python -m rl.train_grpo --arm baseline --seed 42     # Gate 2: does RL learn at all?
+
+pytest tests/                       # 53 tests
 ```
 
-Stages are gates. **If `control` does not roughly reproduce the paper's Countdown
-numbers, the harness is wrong and nothing downstream is interpretable** — fix that
-before reading anything into `main`. Runs are resumable; completed cells are
-skipped on restart.
+Stages are **gates**. If the Countdown control doesn't reproduce ~24%, the harness is
+wrong and nothing downstream means anything — fix that first.
 
-Needs one GPU with ≥20GB free (8B bf16 ≈ 16GB + SAE). Validated on a GB10
-(DGX Spark) with torch 2.13/cu130.
-
-## What the results mean
-
-| Countdown control | GPQA / MATH-Hard | Reading |
-|---|---|---|
-| reproduces | candidates beat matched controls | Society-of-thought mechanism generalizes. The paper's claim is stronger than it proved. |
-| reproduces | DiD ≈ 0 | The steering effect is real but **not conversational** — it's perturbation, and Countdown's headroom flattered it. |
-| reproduces | nothing moves anywhere | Effect is Countdown-specific. The mechanistic claim doesn't survive contact with real reasoning tasks. |
-| fails | — | Our harness is wrong. Stop; debug the hook point and the SAE-space rescaling. |
-
-A null result here is *informative*, not a failed experiment — which is why the
-analysis reports parse and truncation rates too. Positive steering makes traces
-chattier and likelier to run past the token budget, and a trace that never emits
-an answer must be scored **wrong**, not dropped — otherwise steering "improves"
-accuracy by shrinking the denominator.
+Needs one GPU with ≥20GB. **Don't run this on a unified-memory box** (DGX Spark): a GPU
+over-allocation there starves the OS and takes the whole machine down, rather than just
+killing your job. We learned that twice.
 
 ## Layout
 
 ```
-sot/sae.py            SAE loading; the SAE-space <-> real-space rescaling
-sot/steering.py       activation-addition hook on a decoder layer
-sot/validate_hook.py  preflight: resolves the hook-point contradiction
-sot/features.py       feature selection + sparsity/magnitude-matched controls
-sot/data.py           GPQA-Diamond, MATH-Hard, Countdown
-sot/grade.py          answer extraction; unparseable == wrong
-sot/run_sweep.py      the sweep (resumable)
-sot/analyze.py        accuracy, problem-clustered bootstrap CIs, the DiD
+sot/            steering: SAE loading, the hook, calibration, grading, the sweep
+rl/             the RL half: SFT data generation, GRPO training, provenance checking
+tests/          53 tests — the graders, the SAE maths, the hook, the arm-matching
+scripts/        staged runners + RunPod provisioning
+results/        raw traces (5,664 attempts) and findings
 ```
 
 ## Provenance of the artifacts
 
-The paper ships **no code and no data**. Everything here is rebuilt from public
-sources:
-
 - Model: `deepseek-ai/DeepSeek-R1-Distill-Llama-8B` (MIT)
-- SAEs: `OpenMOSS-Team/Llama-Scope-R1-Distill` (Apache-2.0). The paper's
-  `15-llamascope-slimpj-res-32k` is the `800M-Slimpajama-0-OpenR1-Math-220k/L15R`
-  subdirectory. Only layer 15 exists for the pure-SlimPajama mixture; all 32
-  layers exist for the SlimPajama+OpenR1 mixture, which is what the layer sweep
-  uses.
-- Feature explanations, max-activations, firing rates: Neuronpedia's S3 export
-  (GPT-4o-mini autointerp — the same model the paper cites; note the *website* now
-  serves regenerated Claude explanations for some features, so pin the source).
-- GPQA-Diamond: `fingertap/GPQA-Diamond` (the official `iDavidRein/gpqa` is gated).
-- MATH-Hard: `lighteval/MATH-Hard`. Countdown: `Jiayi-Pan/Countdown-Tasks-3to4`.
+- SAEs: `OpenMOSS-Team/Llama-Scope-R1-Distill` (Apache-2.0) — the paper's is the
+  `800M-Slimpajama-0-OpenR1-Math-220k/L15R` subdirectory
+- Feature labels + firing stats: Neuronpedia's S3 export (GPT-4o-mini autointerp)
+- GPQA: `fingertap/GPQA-Diamond` (the official one is gated) · MATH: `lighteval/MATH-Hard`
+  · Countdown: `Jiayi-Pan/Countdown-Tasks-3to4`
 
-What is *not* reproducible: the authors' 8,262 generated traces and their
-LLM-as-judge annotations. The judge prompts and rubrics are in the paper's
-~82-page supplement, as prose.
+## The caveat that applies to us *and* to the paper
+
+`DeepSeek-R1-Distill-Llama-8B` **was never RL'd**. It's Llama-3.1-8B fine-tuned to *imitate*
+R1's outputs. It's the only reasoning model with a public SAE, so it's what the paper used
+and what we used.
+
+Which means the field's mechanistic understanding of reasoning models currently rests on a
+model that is an *impersonation* of one. Training an SAE on a genuinely RL'd reasoner
+(QwQ-32B) is the obvious next step, and nobody has done it.

@@ -1,5 +1,15 @@
 .venv/
+.venv-test/
+.hf/
 __pycache__/
 *.pyc
-results/
 *.egg-info/
+
+# Raw generation traces are large (70MB+) and reproducible from the scripts.
+# The findings, the calibrations and the verified SFT data are NOT reproducible
+# cheaply, so they are tracked.
+results/**/*.jsonl
+results/*.jsonl
+results/**/*.npz
+results/runpod_*.json
+results/ml-intern-postmortem/

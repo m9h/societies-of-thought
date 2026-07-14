@@ -95,8 +95,12 @@ def main() -> None:
     tok.padding_side = "left"
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
+    # sdpa over eager: ~15% on this box. The bigger lever is --batch-size (2.4x from
+    # 16 -> 48) and a tight --max-new-tokens, because generate() runs until the LONGEST
+    # sequence in the batch stops -- and a degenerately-steered trace never emits EOS,
+    # so every batch pays the full max_new_tokens no matter how fast its neighbours end.
     model = AutoModelForCausalLM.from_pretrained(
-        MODEL, torch_dtype=torch.bfloat16, device_map=device
+        MODEL, dtype=torch.bfloat16, device_map=device, attn_implementation="sdpa"
     ).eval()
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
@@ -161,7 +165,7 @@ def main() -> None:
 def _run_condition(model, tok, sae, problems, task, layer, feature, role, alpha,
                    strength, args, done, hook_layer_offset):
     fid = feature.index if feature is not None else -1
-    key_prefix = (task, layer, fid, round(strength, 6))
+    key_prefix = (task, layer, fid, round(strength, 6), args.scope)
 
     todo = [
         (p, s) for p in problems for s in range(args.samples)
@@ -209,7 +213,7 @@ def _run_condition(model, tok, sae, problems, task, layer, feature, role, alpha,
                     "task": task, "pid": p.pid, "sample": sample,
                     "layer": layer, "hook_layer": hook_layer,
                     "feature": fid, "role": role,
-                    "alpha": alpha, "strength": strength,
+                    "alpha": alpha, "strength": strength, "scope": args.scope,
                     "correct": bool(g.correct), "parsed": bool(g.parsed),
                     "pred": g.pred, "gold": p.answer,
                     "n_tokens": int((row != tok.pad_token_id).sum()),
@@ -243,7 +247,7 @@ def _completed(path: Path) -> set:
             except json.JSONDecodeError:
                 continue  # tolerate a torn final line from a killed run
             done.add((r["task"], r["layer"], r["feature"], round(r["strength"], 6),
-                      r["pid"], r["sample"]))
+                      r.get("scope", "all"), r["pid"], r["sample"]))
     return done
 
 

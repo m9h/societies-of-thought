@@ -22,6 +22,8 @@ from dataclasses import dataclass
 
 from datasets import load_dataset
 
+from .extract import extract_boxed
+
 GPQA_REPO = "fingertap/GPQA-Diamond"  # ungated 198-item MCQ mirror
 MATH_HARD_REPO = "lighteval/MATH-Hard"
 COUNTDOWN_REPO = "Jiayi-Pan/Countdown-Tasks-3to4"
@@ -116,30 +118,3 @@ def load_problems(task: str, n: int | None = None, seed: int = 0) -> list[Proble
         problems = rng.sample(problems, n)
     return problems
 
-
-def extract_boxed(text: str) -> str | None:
-    """Return the content of the LAST \\boxed{...}, brace-matched."""
-    key = "\\boxed"
-    start = text.rfind(key)
-    if start == -1:
-        return None
-    i = start + len(key)
-    while i < len(text) and text[i] != "{":
-        if not text[i].isspace():
-            return None
-        i += 1
-    if i >= len(text):
-        return None
-    depth = 0
-    out = []
-    for ch in text[i:]:
-        if ch == "{":
-            depth += 1
-            if depth == 1:
-                continue
-        elif ch == "}":
-            depth -= 1
-            if depth == 0:
-                return "".join(out).strip()
-        out.append(ch)
-    return None
