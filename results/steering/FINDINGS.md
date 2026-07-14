@@ -124,7 +124,50 @@ people arguing. The conversational structure is therefore plausibly a **stylisti
 signature of self-correction, not its cause**. The paper measured the shadow and steered
 it; steering a shadow harder does not move the object.
 
-## 6. Limitations (ours, and the field's)
+## 6. Independent support: accuracy and "society" come apart
+
+Huot, Kaisers & Lapata, *[When is Routing Meaningful? Diversity and Robustness in Language
+Model Societies](https://arxiv.org/abs/2607.09197)* (cs.MA, Jul 2026), reach the same
+dissociation from the opposite direction — at the multi-**model** level rather than inside
+one model's activations.
+
+Their argument is that routing over a society of models is evaluated almost entirely on
+accuracy and cost, and that this is not enough. Two further properties decide whether a
+society is *meaningful*: **behavioural differentiation** among the actors, and **routing
+stability**. Their central line:
+
+> "High task accuracy is compatible with violating both properties, since a router can
+> operate over a **redundant society** or assign queries inconsistently."
+
+They conclude that **"accuracy and meaningfulness can sharply diverge."**
+
+That is our finding, mirrored:
+
+| | they show | we show |
+|---|---|---|
+| dissociation | high accuracy with a **redundant** (fake) society | a **real** society with degraded accuracy |
+| level | between models (routing) | inside one model (steering) |
+
+Both cases break the inference Kim et al. rely on. Their design measures conversational
+behaviour and accuracy *together*, on a task where both happen to rise, and concludes that
+the first mediates the second. Two independent lines of evidence now say that inference is
+unsafe: you can have the accuracy without the society, and — as we show — the society
+without the accuracy.
+
+**Two instruments from that paper are directly applicable here, and we have not used them:**
+
+- **Hierarchic Social Entropy.** Kim et al. quantify "perspective diversity" with an
+  LLM-as-judge that first *infers* the personas and then *measures* their spread — the
+  judge is scoring constructs it invented. HSE is a principled, judge-free diversity
+  metric. Applying it to R1's traces would test their descriptive claim (which we do not
+  dispute) on much firmer ground, and would answer whether R1's internal voices are
+  genuinely differentiated or a **redundant society wearing dialogic clothes**.
+- **Perturbation robustness.** Their robustness metric asks whether a society survives
+  being poked. Our dose-response *is* that experiment, and the society fails it: the
+  inverted-U collapses into degenerate babble (3.5%, 96% unparseable) at the paper's own
+  upper dose. In their terms, this society is not robust.
+
+## 7. Limitations (ours, and the field's)
 
 - **The model is not actually a reasoning model.** `DeepSeek-R1-Distill-Llama-8B` was
   never RL'd; it is Llama-3.1-8B *supervised-fine-tuned to imitate* R1's outputs. The
@@ -136,7 +179,7 @@ it; steering a shadow harder does not move the object.
 - GPQA arm truncation-limited (see above).
 - Our claim is scoped exactly as the paper's is: within this model, on these benchmarks.
 
-## 7. A correction to the public record
+## 8. A correction to the public record
 
 Neuronpedia lists this SAE's hook point as **`blocks.15.hook_resid_pre`**. The SAE's own
 config says **`resid_post`**, and reconstruction settles it decisively (52.5% vs 27.5%

@@ -87,6 +87,31 @@ We also do what the paper didn't: **≥3 random seeds per arm.** Their headline 
 early-training gap, which is exactly where seed noise is largest, and they appear to report
 single runs.
 
+### Independent support: accuracy and "society" come apart
+
+[Huot, Kaisers & Lapata (2026)](https://arxiv.org/abs/2607.09197) reach the same
+dissociation from the opposite direction — between models rather than inside one. Routing
+over a society of models, they argue, is judged almost entirely on accuracy, and that is
+not enough: *"high task accuracy is compatible with ... a **redundant society**."* They
+conclude that **"accuracy and meaningfulness can sharply diverge."**
+
+Mirror images:
+
+| | they show | we show |
+|---|---|---|
+| | high accuracy with a **fake** society | a **real** society with worse accuracy |
+| level | between models (routing) | inside one model (steering) |
+
+Both break the inference the paper depends on. It measures conversational behaviour and
+accuracy *together*, on a task where both rise, and concludes the first causes the second.
+You can have the accuracy without the society — and, as we show, the society without the
+accuracy.
+
+Their **Hierarchic Social Entropy** is also a judge-free alternative to the paper's
+"perspective diversity" measure (an LLM-judge that *infers* the personas it then *scores*).
+Applying it would test whether R1's internal voices are genuinely differentiated, or a
+redundant society wearing dialogic clothes. We haven't done that; it's the obvious next step.
+
 ---
 
 ## The bugs worth knowing about

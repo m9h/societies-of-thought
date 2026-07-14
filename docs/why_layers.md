@@ -166,6 +166,20 @@ looked everywhere it could have been true*."
 
 ---
 
+## 6. A related dissociation, at the level above
+
+Everything above is about locating a mechanism *inside* one model. Huot, Kaisers & Lapata,
+*[When is Routing Meaningful?](https://arxiv.org/abs/2607.09197)* (2026), show the same
+trap one level up, between models: a router can hit high accuracy while operating over a
+**redundant society** — actors that are not actually differentiated. They conclude
+"accuracy and meaningfulness can sharply diverge," and propose **Hierarchic Social Entropy**
+as a judge-free measure of whether a society is real.
+
+The parallel to the layer question is exact. *Where* a mechanism lives, and *whether* it is
+doing work, are separate questions — and a metric that conflates them (accuracy for them;
+weight-change for us) will mislead. This is why the weight analysis above is a **prior**,
+not an answer, and why the causal sweep is the experiment that settles it.
+
 ## References
 
 - Zeiler & Fergus (2014), *Visualizing and Understanding Convolutional Networks*
@@ -179,3 +193,5 @@ looked everywhere it could have been true*."
 - Martin & Mahoney (2021), *Predicting trends in the quality of state-of-the-art neural
   networks without access to training or test data*, Nature Communications
 - Belrose et al. (2023), *Eliciting Latent Predictions from Transformers with the Tuned Lens*
+- Huot, Kaisers & Lapata (2026), *When is Routing Meaningful? Diversity and Robustness in
+  Language Model Societies* (arXiv:2607.09197)
