@@ -92,6 +92,23 @@ def test_bad_layer_index_raises_loudly_not_silently(tiny):
                             max_seq_len=128, skip_first=16)
 
 
+def test_probe_and_fit_must_share_dim_batch(tiny):
+    """The Tier-0 refinement: a probe only guards the fit if it uses the SAME memory
+    parameters. jlens's probe default (dim_batch=8) passed while the fit (dim_batch=128)
+    OOM'd and got swallowed. The two calls must share dim_batch faithfully."""
+    from jlens.fitting import jacobian_for_prompt
+    from jlens_lab import fit_converged
+
+    model, tok = tiny
+    lm = jlens.from_hf(model, tok)
+    db = 4
+    per_prompt, _, _ = jacobian_for_prompt(lm, _long_prompt(), source_layers=[1],
+                                           dim_batch=db, max_seq_len=128, skip_first=16)
+    lens, _ = fit_converged(lm, [_long_prompt()] * 20, source_layers=[1],
+                            dim_batch=db, min_prompts=5, verbose=False)
+    assert 1 in per_prompt and 1 in lens.jacobians
+
+
 def test_fit_converged_populates_jacobians(tiny):
     """End to end: the wrapper must yield a lens whose .jacobians has the source layer."""
     from jlens_lab import fit_converged

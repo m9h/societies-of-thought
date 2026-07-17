@@ -84,6 +84,14 @@ def main() -> None:
     ap.add_argument("--n-prompts", type=int, default=256)
     ap.add_argument("--n-random-features", type=int, default=300)
     ap.add_argument("--out", type=Path, default=Path("results/steering/jspace_tier0.json"))
+    ap.add_argument("--dim-batch", type=int, default=32,
+                    help="Jacobian output dims per pass. Memory scales with this; jlens's "
+                         "default 128 OOMs an A40 on an 8B model (and fit_converged SWALLOWS "
+                         "the OOM as 'no prompt produced a Jacobian'). Used in the probe too, "
+                         "so the probe exercises the same memory the fit will.")
+    ap.add_argument("--dtype", default="bfloat16", choices=["bfloat16", "float32"],
+                    help="bf16 fits with margin (16GB); if the un-swallowed probe raises "
+                         "on bf16 backward, rerun with float32.")
     args = ap.parse_args()
 
     device = "cuda"
@@ -99,8 +107,8 @@ def main() -> None:
     #  - the Jacobian estimator backprops through the forward; bf16 backward is fragile.
     #  - device_map= attaches accelerate dispatch hooks that fight jlens's own activation
     #    recorder. .to(device) keeps the module graph clean. (8B fp32 ~= 32GB; fits the A40.)
-    model = AutoModelForCausalLM.from_pretrained(MODEL, torch_dtype=torch.float32).eval()
-    model = model.to(device)
+    dt = getattr(torch, args.dtype)
+    model = AutoModelForCausalLM.from_pretrained(MODEL, torch_dtype=dt).eval().to(device)
     lens_model = jlens.from_hf(model, tok)
 
     prompts = wikitext(tok, n=args.n_prompts, min_tokens=160, max_chars=4000)
@@ -113,7 +121,7 @@ def main() -> None:
     print(f"probe: one Jacobian at L{args.layer} (un-swallowed) ...", flush=True)
     per_prompt, seq_len, n_valid = jacobian_for_prompt(
         lens_model, prompts[0], source_layers=[args.layer],
-        max_seq_len=128, skip_first=16,
+        dim_batch=args.dim_batch, max_seq_len=128, skip_first=16,
     )
     assert per_prompt[args.layer].shape == (lens_model.d_model, lens_model.d_model)
     print(f"  probe OK: J_{args.layer} is {tuple(per_prompt[args.layer].shape)}, "
@@ -121,7 +129,8 @@ def main() -> None:
 
     # --- fit the Jacobian lens (jlens-lab's converged fit, not the under-fit default) ---
     print(f"fitting Jacobian lens on {len(prompts)} wikitext prompts ...", flush=True)
-    lens, report = fit_converged(lens_model, prompts, source_layers=[args.layer], verbose=True)
+    lens, report = fit_converged(lens_model, prompts, source_layers=[args.layer],
+                                 dim_batch=args.dim_batch, verbose=True)
     print(f"  lens fit: converged={getattr(report, 'converged', '?')}, "
           f"layers={sorted(lens.jacobians)}")
 

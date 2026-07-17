@@ -1,0 +1,50 @@
+{
+ "layer": 15,
+ "jspace_dim": 2065,
+ "d_model": 4096,
+ "features": {
+  "30939": {
+   "label": "anchor (paper's feature)",
+   "align": 0.7502793669700623
+  },
+  "3114": {
+   "label": "candidate",
+   "align": 0.7754068374633789
+  },
+  "10126": {
+   "label": "candidate",
+   "align": 0.8683356642723083
+  },
+  "20402": {
+   "label": "candidate",
+   "align": 0.8167124390602112
+  },
+  "5993": {
+   "label": "matched control",
+   "align": 0.7348666787147522
+  },
+  "22600": {
+   "label": "matched control",
+   "align": 0.7709305286407471
+  },
+  "26919": {
+   "label": "matched control",
+   "align": 0.7238694429397583
+  }
+ },
+ "sae_population": {
+  "mean": 0.7284282298882803,
+  "std": 0.042784253270533625,
+  "n": 300,
+  "pct": [
+   0.65000721514225,
+   0.7292928099632263,
+   0.8028502762317657
+  ]
+ },
+ "gaussian_floor": {
+  "mean": 0.7103288859128952,
+  "std": 0.007966033914340198
+ },
+ "anchor_percentile_in_sae_pop": 74.0
+}

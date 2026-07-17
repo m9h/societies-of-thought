@@ -34,7 +34,7 @@ PROFILES = {
     # 3B PPO (actor + critic + reference + optimizer states): buy VRAM, not bandwidth.
     "rl": {"gpu": "A100 PCIe", "disk": 120},
     # Jacobian-lens fitting on an 8B model: modest, cheapest GPU that fits it.
-    "jlens": {"gpu": "A40", "disk": 60},
+    "jlens": {"gpu": "H100 PCIe", "disk": 80},
 }
 
 # H100 PCIe: 80GB, ~2TB/s memory bandwidth (~7x the Spark). The 8B model plus SAE is

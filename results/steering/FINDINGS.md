@@ -219,7 +219,62 @@ without the substance — which is exactly why accuracy falls (§3–4) while th
 rise. This is the within-model instance of Huot et al.'s between-model result: a society can
 look richer while being emptier.
 
-## 8. Limitations (ours, and the field's)
+## 8. J-space Tier 0: a pre-registered prediction, REFUTED
+
+We connected the steering result to the global-workspace framework of Anthropic's J-space
+paper (transformer-circuits.pub/2026/workspace), via the m9h fork of jacobian-lens + the
+jlens-lab convergence controls. Fitted a converged Jacobian lens for
+DeepSeek-R1-Distill-Llama-8B (497 prompts, `converged=True`, mean_rel_change < 0.002), took
+the J-space subspace at layer 15, and measured how much of each SAE feature's steering
+direction lies inside it.
+
+**Pre-registered prediction (before looking):** the paper's load-bearing property is
+*limited scope* -- the workspace drives multi-step reasoning. Our steering killed multi-step
+reasoning (MATH -22) while adding fluency. So we predicted the conversational feature would
+be *orthogonal* to the workspace: steering it injects off-workspace, dialogic activity that
+does not drive reasoning.
+
+**Result: the prediction is wrong.**
+
+```
+random Gaussian floor    0.710
+SAE population (n=300)    0.728   [5/50/95: 0.650/0.729/0.803]
+matched controls         0.743
+conversational features  0.803        <- ABOVE population, not below
+anchor f30939            0.750   (74th percentile of SAE features)
+```
+
+The conversational feature is *more* workspace-resident than the average SAE feature and
+than the matched controls -- the opposite of orthogonal. The clean "steering injects
+off-workspace noise" story is dead.
+
+*Caveat:* the J-space subspace at var=0.99 is large (2065 of 4096 dims), so a random
+direction already scores 0.71 by dimension-counting, and absolute alignment is a weak
+instrument. But the ordering conv > control > pop > floor is robust to subspace size -- it
+is the same converged lens and the same directions -- so the refutation stands.
+
+**Revised interpretation.** The knob IS connected to the machine. The conversational feature
+is a genuine workspace direction, and steering it does not bypass the reasoning workspace --
+it *over-drives* a direction inside it. That is consistent with the HSE result (§7): pushing
+this workspace-resident direction harder collapses the workspace's diversity into redundancy
+and then noise, degrading the multi-step computation it is part of. "Cranking a real knob
+breaks the machine," not "the knob was never attached."
+
+This refines, and does not overturn, the headline (§3-5): steering the paper's feature still
+reverses reasoning on real benchmarks. What Tier 0 changes is the *mechanism* -- workspace
+corruption by saturation, not off-workspace injection.
+
+**What Tier 0 did NOT do, and Tier 1 would:** this is a static test of a feature's
+*direction*. It does not capture J-space during the steered runs. The faithful next
+experiment (Tier 1) re-forwards the actual reasoning traces through the model, projects the
+layer-15 activations at each segment through the lens, and measures workspace diversity per
+steering condition -- i.e. the paper's own experiment, in workspace coordinates. Prediction:
+the HSE redundancy of §7 is sharper in J-space than in surface-text space. Not yet run.
+
+Data: `results/steering/jspace_tier0.json`, `analysis/jspace_tier0.py`, 8 tests in
+`tests/test_jspace.py`. Fitted on an H100; lens converged at 497 prompts.
+
+## 9. Limitations (ours, and the field's)
 
 - **The model is not actually a reasoning model.** `DeepSeek-R1-Distill-Llama-8B` was
   never RL'd; it is Llama-3.1-8B *supervised-fine-tuned to imitate* R1's outputs. The
@@ -231,7 +286,7 @@ look richer while being emptier.
 - GPQA arm truncation-limited (see above).
 - Our claim is scoped exactly as the paper's is: within this model, on these benchmarks.
 
-## 9. A correction to the public record
+## 10. A correction to the public record
 
 Neuronpedia lists this SAE's hook point as **`blocks.15.hook_resid_pre`**. The SAE's own
 config says **`resid_post`**, and reconstruction settles it decisively (52.5% vs 27.5%
