@@ -15,8 +15,12 @@ each call site. Every one of these has cost us a wrong run at least once:
               resid_pre and is wrong. Gemma states `model.layers.N.output` in its own
               config, so there is nothing to guess.
 
-  layers      Which layers actually have a published residual SAE. Llama Scope slimpj:
-              layer 15 only. Gemma 3 27B: 16/31/40/41/53 only.
+  layers      Which layers actually have a published residual SAE -- and for Llama Scope
+              this depends on the MIXTURE, not just the model. The pure-slimpj SAE (the
+              paper's) exists at layer 15 only; the slimpj+openr1 "mixed" suite covers all
+              32. Collapsing the two blocked 5 of the 6 layers in a sweep already running,
+              so availability is a function of (model, mixture).
+              Gemma 3 27B: residual SAEs at 16/31/40/41/53 only.
 
 Registry entries are data, so a wrong one fails in tests rather than as a plausible
 number on a rented GPU.
@@ -44,10 +48,14 @@ class ModelSpec:
     anchor_feature: int | None
 
 
+ALL_LLAMA_LAYERS = frozenset(range(32))     # DeepSeek-R1-Distill-Llama-8B has 32 layers
+
+
 @dataclass(frozen=True)
 class _Entry:
     sae_kind: str
-    layers: frozenset[int]
+    # mixture -> available layers. Gemma has no mixtures, so it uses the "" key.
+    layers_by_mixture: dict[str, frozenset[int]]
     default_layer: int
     d_model: int
     anchor_feature: int | None = None
@@ -59,14 +67,18 @@ class _Entry:
 MODELS: dict[str, _Entry] = {
     "deepseek-ai/DeepSeek-R1-Distill-Llama-8B": _Entry(
         sae_kind="llama_scope",
-        layers=frozenset({15}),      # the pure-slimpj SAE the paper used exists only here
+        layers_by_mixture={
+            "slimpj": frozenset({15}),   # the paper's SAE genuinely exists at one layer
+            "mixed": ALL_LLAMA_LAYERS,   # slimpj+openr1: all 32 -- what the layer sweep uses
+            "openr1": ALL_LLAMA_LAYERS,
+        },
         default_layer=15,            # the paper's claimed mechanism site
         d_model=4096,
         anchor_feature=30939,        # the paper's conversational-surprise feature
     ),
     "google/gemma-3-27b-it": _Entry(
         sae_kind="gemma_scope",
-        layers=GEMMA3_27B_RES_LAYERS,
+        layers_by_mixture={"": GEMMA3_27B_RES_LAYERS},
         default_layer=16,
         d_model=5376,
         anchor_feature=None,         # no known anchor; lexicon selector picks one
@@ -85,11 +97,19 @@ def resolve_model(model: str, layer: int | None = None, *, width: str = "16k",
         )
 
     layer = entry.default_layer if layer is None else layer
-    if layer not in entry.layers:
+    key = mixture if entry.sae_kind == "llama_scope" else ""
+    available = entry.layers_by_mixture.get(key)
+    if available is None:
+        raise ValueError(f"unknown mixture {mixture!r} for {model}; "
+                         f"try {sorted(entry.layers_by_mixture)}")
+    if layer not in available:
+        shown = sorted(available)
+        shown = shown if len(shown) <= 8 else f"{shown[:4]}...{shown[-2:]}"
         raise ValueError(
-            f"layer {layer} is not available for {model}: published residual SAEs are at "
-            f"{sorted(entry.layers)}. Steering a layer with no SAE is not a thing you can "
-            "do quietly -- it would download zero features and look like an unlabelled SAE."
+            f"layer {layer} is not available for {model} (mixture={mixture!r}): published "
+            f"residual SAEs are at {shown}. Steering a layer with no SAE is not something "
+            "you can do quietly -- it would download zero features and look like an "
+            "unlabelled SAE."
         )
 
     kw = {"width": width} if entry.sae_kind == "gemma_scope" else {"mixture": mixture}

@@ -93,3 +93,24 @@ def test_anchor_feature_is_model_specific_not_layer_specific():
         "Gemma has no known conversational anchor; selection must fall back to the "
         "lexicon rather than reuse an index from a different SAE"
     )
+
+
+# --- layer availability is MIXTURE-dependent for Llama Scope -------------------
+# Regression guard. The registry first hardcoded layers={15} for DeepSeek, which is true
+# only of the pure-slimpj SAE (the paper's). The slimpj+openr1 "mixed" suite is published
+# for ALL 32 layers -- and that is what the layer sweep uses. Flattening the two blocked
+# 5 of the 6 layers in a sweep we had already started running.
+
+@pytest.mark.parametrize("layer", [5, 10, 15, 20, 25, 30])
+def test_mixed_mixture_exposes_all_layers(layer):
+    spec = resolve_model("deepseek-ai/DeepSeek-R1-Distill-Llama-8B", layer, mixture="mixed")
+    assert spec.layer == layer
+    assert spec.neuronpedia[1] == f"{layer}-llamascope-slimpj-openr1-res-32k"
+
+
+def test_slimpj_mixture_is_layer_15_only():
+    """The paper's own SAE genuinely exists at one layer -- that constraint is real."""
+    assert resolve_model("deepseek-ai/DeepSeek-R1-Distill-Llama-8B", 15,
+                         mixture="slimpj").layer == 15
+    with pytest.raises(ValueError, match="(?i)not available"):
+        resolve_model("deepseek-ai/DeepSeek-R1-Distill-Llama-8B", 20, mixture="slimpj")
