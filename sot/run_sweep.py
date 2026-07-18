@@ -36,9 +36,12 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from .data import load_problems
 from .features import ANCHOR_FEATURE, Feature, load_features, select
 from .grade import grade
-from .sae import load_sae, neuronpedia_source_id
+from .registry import load_sae_for, resolve_model
 from .steering import steer
 
+# Default stays the paper's model so existing results reproduce with no flags.
+# --model google/gemma-3-27b-it runs the identical protocol on a model the paper
+# never tested; sot/registry.py owns every per-model difference.
 MODEL = "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
 
 # Cheap lexical proxies for the paper's LLM-judged "conversational behaviours".
@@ -59,7 +62,12 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--tasks", nargs="+", default=["gpqa", "math_hard"],
                     choices=["gpqa", "math_hard", "countdown"])
-    ap.add_argument("--layers", nargs="+", type=int, default=[15])
+    ap.add_argument("--model", default=MODEL,
+                    help="deepseek-ai/DeepSeek-R1-Distill-Llama-8B (paper's) or "
+                         "google/gemma-3-27b-it (the extension). See sot/registry.py.")
+    ap.add_argument("--layers", nargs="+", type=int, default=None,
+                    help="default: the model's registry default (15 for DeepSeek, 16 for Gemma)")
+    ap.add_argument("--width", default="16k", help="Gemma Scope SAE width")
     ap.add_argument("--mixture", default="slimpj",
                     help="slimpj = the paper's SAE (layer 15 only). mixed = all 32 layers.")
     ap.add_argument("--features", nargs="+", type=int, default=None,
@@ -91,7 +99,11 @@ def main() -> None:
     hook_layer_offset = _resolve_hook(args.hook_point)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    tok = AutoTokenizer.from_pretrained(MODEL)
+    specs = [resolve_model(args.model, l, width=args.width, mixture=args.mixture)
+             for l in (args.layers or [None])]
+    print(f"model: {args.model}  sae: {specs[0].sae_kind}  layers: {[s.layer for s in specs]}")
+
+    tok = AutoTokenizer.from_pretrained(args.model)
     tok.padding_side = "left"
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
@@ -100,7 +112,7 @@ def main() -> None:
     # sequence in the batch stops -- and a degenerately-steered trace never emits EOS,
     # so every batch pays the full max_new_tokens no matter how fast its neighbours end.
     model = AutoModelForCausalLM.from_pretrained(
-        MODEL, dtype=torch.bfloat16, device_map=device, attn_implementation="sdpa"
+        args.model, dtype=torch.bfloat16, device_map=device, attn_implementation="sdpa"
     ).eval()
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
@@ -108,10 +120,11 @@ def main() -> None:
     if done:
         print(f"resuming: {len(done)} attempts already recorded in {args.out}")
 
-    for layer in args.layers:
-        sae = load_sae(layer, args.mixture, device=device)
-        source = neuronpedia_source_id(layer, args.mixture)
-        feats = load_features(source, args.cache)
+    for spec in specs:
+        layer = spec.layer
+        sae = load_sae_for(spec, device=device, width=args.width, mixture=args.mixture)
+        np_model, source = spec.neuronpedia
+        feats = load_features(source, args.cache, np_model=np_model)
         _apply_calibration(feats, layer, args.mixture)
 
         if args.features:
@@ -124,7 +137,10 @@ def main() -> None:
                 n_candidates=args.n_candidates,
                 n_controls=args.n_controls,
                 method=args.select_method,
-                anchor=ANCHOR_FEATURE if layer == 15 else _layer_anchor(feats),
+                # model-specific, not layer-specific: a feature index means nothing
+                # across two different SAEs (see sot/registry.py).
+                anchor=(spec.anchor_feature if spec.anchor_feature is not None
+                        else _layer_anchor(feats)),
                 seed=args.seed,
             )
 

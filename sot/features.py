@@ -72,14 +72,19 @@ class Feature:
     role: str = ""  # candidate | control_matched | control_random | anchor
 
 
-def _download_shards(source_id: str, kind: str, cache: Path) -> list[dict]:
-    """kind is 'explanations' or 'features'. Shards are batch-N.jsonl.gz."""
-    out_path = cache / f"{MODEL_ID}__{source_id}__{kind}.jsonl"
+def _download_shards(source_id: str, kind: str, cache: Path,
+                     np_model: str = MODEL_ID) -> list[dict]:
+    """kind is 'explanations' or 'features'. Shards are batch-N.jsonl.gz.
+
+    np_model is the Neuronpedia model id, which differs per family
+    (deepseek-r1-distill-llama-8b vs gemma-3-27b-it). See sot/sources.py.
+    """
+    out_path = cache / f"{np_model}__{source_id}__{kind}.jsonl"
     if out_path.exists():
         return [json.loads(l) for l in out_path.read_text().splitlines() if l.strip()]
 
     cache.mkdir(parents=True, exist_ok=True)
-    prefix = f"v1/{MODEL_ID}/{source_id}/{kind}/"
+    prefix = f"v1/{np_model}/{source_id}/{kind}/"
     keys = _list_keys(prefix)
     if not keys:
         raise RuntimeError(f"no {kind} shards on S3 for {source_id!r}")
@@ -116,16 +121,17 @@ def _list_keys(prefix: str) -> list[str]:
     return keys
 
 
-def load_features(source_id: str, cache: Path) -> dict[int, Feature]:
+def load_features(source_id: str, cache: Path,
+                  np_model: str = MODEL_ID) -> dict[int, Feature]:
     feats: dict[int, Feature] = {}
-    for r in _download_shards(source_id, "features", cache):
+    for r in _download_shards(source_id, "features", cache, np_model):
         i = int(r["index"])
         feats[i] = Feature(
             index=i,
             max_act=float(r.get("maxActApprox") or 0.0),
             frac_nonzero=float(r.get("frac_nonzero") or 0.0),
         )
-    for r in _download_shards(source_id, "explanations", cache):
+    for r in _download_shards(source_id, "explanations", cache, np_model):
         i = int(r["index"])
         if i in feats:
             feats[i].description = (r.get("description") or "").strip()
