@@ -1,0 +1,49 @@
+{
+  "layer": 15,
+  "mixture": "slimpj",
+  "feature": 30939,
+  "hook_point": "resid_post",
+  "hook_layer": 15,
+  "dataset_avg_norm": 11.574640274047852,
+  "sae_to_real": 0.18085375428199768,
+  "detail": {
+    "resid_post": {
+      "peak_on_conversational": 18.392,
+      "peak_on_control": 0.0,
+      "rel_err_vs_neuronpedia": 2.114,
+      "top_tokens": [
+        [
+          "'\u0120Oh'",
+          18.39
+        ],
+        [
+          "'\u0120Oh'",
+          16.49
+        ],
+        [
+          "'\u0120Oh'",
+          14.95
+        ]
+      ]
+    },
+    "resid_pre": {
+      "peak_on_conversational": 12.062,
+      "peak_on_control": 0.0,
+      "rel_err_vs_neuronpedia": 1.042,
+      "top_tokens": [
+        [
+          "'\u0120Oh'",
+          12.06
+        ],
+        [
+          "'\u0120Oh'",
+          10.67
+        ],
+        [
+          "'\u0120Oh'",
+          9.98
+        ]
+      ]
+    }
+  }
+}
