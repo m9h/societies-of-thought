@@ -34,6 +34,21 @@
 set -euo pipefail
 cd "${SLURM_SUBMIT_DIR:-$(dirname "$0")/..}"
 
+# HF CACHE. ~/.cache/huggingface/hub is owned by root (created Jul 1 by
+# something running as root), so model downloads there fail with a
+# PermissionError that transformers misreports as a stale lock. Rather than
+# needing sudo, point HF_HOME at /mnt/t9, which is user-owned with 2.6T free and
+# is the local staging disk anyway -- NFS is the wrong place for a 16GB
+# checkpoint. The auth token still lives in the old cache and is readable, so
+# carry it across explicitly; without it the new HF_HOME has no token and
+# transformers reports a public repo as "not a valid model identifier".
+export HF_HOME="${HF_HOME:-/mnt/t9/hf-cache}"
+if [ -z "${HF_TOKEN:-}" ] && [ -r "$HOME/.cache/huggingface/token" ]; then
+    HF_TOKEN="$(cat "$HOME/.cache/huggingface/token")"
+    export HF_TOKEN
+fi
+mkdir -p "$HF_HOME"
+
 PY=.venv/bin/python
 [ -x "$PY" ] || PY=python
 
@@ -44,6 +59,7 @@ echo "host        : $(hostname)"
 echo "layers      : $LAYERS"
 echo "out         : $OUT  ($( [ -f "$OUT" ] && wc -l < "$OUT" || echo 0 ) rows already present)"
 echo "mem cap     : ${SLURM_MEM_PER_NODE:-unset} MB"
+echo "HF_HOME     : $HF_HOME  ($(df -h "$HF_HOME" 2>/dev/null | tail -1 | awk '{print $4}') free)"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || true
 echo
 
