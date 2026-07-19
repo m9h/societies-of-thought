@@ -153,3 +153,84 @@ def test_agreement_holds_at_longer_context():
     a, b = _pt_logits(hf, ids), _pz_logits(pzm, ids)
     rel = abs(a - b).max() / (abs(a).max() or 1.0)
     assert rel < TOL, f"max relative logit difference at 4096 tokens {rel:.3e}"
+
+
+# --- transformers 5.x moved the RoPE config -------------------------------------
+# v4:  config.rope_theta = 500000.0
+#      config.rope_scaling = {"rope_type": "llama3", "factor": 8.0, ...}
+# v5:  config.rope_parameters = {"rope_type": "llama3", "rope_theta": 500000.0,
+#                                "factor": 8.0, ...}   and NO rope_scaling attr
+#
+# Reading only rope_scaling means that under v5 rope_type resolves to None, the
+# loader concludes "no scaling needed", and silently produces an unscaled model.
+# That is the exact silent-wrong-math failure this module exists to prevent,
+# reintroduced by a dependency bump. Verified against the real config on
+# 2026-07-19 with transformers 5.13.1.
+
+class _V5Config:
+    """Minimal stand-in for a transformers 5.x LlamaConfig.
+
+    Deliberately raises AttributeError for rope_scaling / rope_theta, as v5 does
+    -- a Mock returning None would let a buggy loader pass."""
+
+    rope_parameters = {
+        "rope_type": "llama3", "rope_theta": 500000.0, "factor": 8.0,
+        "low_freq_factor": 1.0, "high_freq_factor": 4.0,
+        "original_max_position_embeddings": 8192,
+    }
+
+    def __getattr__(self, name):
+        if name in ("rope_scaling", "rope_theta"):
+            raise AttributeError(name)
+        raise AttributeError(name)
+
+
+class _V5Model:
+    config = _V5Config()
+
+
+def test_reads_transformers_v5_rope_parameters():
+    """The loader must find llama3 scaling under the v5 layout, not silently
+    conclude there is none."""
+    from penzai_backend.loader import rope_settings
+
+    rope_type, scaling = rope_settings(_V5Model().config)
+    assert rope_type == "llama3"
+    assert scaling["factor"] == 8.0
+    assert scaling["original_max_position_embeddings"] == 8192
+
+
+def test_reads_transformers_v4_rope_scaling():
+    """The v4 layout must keep working -- this is what the numerical tests above
+    actually exercise."""
+    from penzai_backend.loader import rope_settings
+
+    hf = _tiny_hf(LLAMA31_SCALING)
+    rope_type, scaling = rope_settings(hf.config)
+    assert rope_type == "llama3"
+    assert scaling["factor"] == 8.0
+
+
+def test_unscaled_config_reports_no_rope_type_under_both_layouts():
+    from penzai_backend.loader import rope_settings
+
+    assert rope_settings(_tiny_hf(None).config)[0] in (None, "default")
+
+    class _V5Plain:
+        rope_parameters = {"rope_type": "default", "rope_theta": 500000.0}
+    assert rope_settings(_V5Plain())[0] in (None, "default")
+
+
+def test_v5_yarn_is_still_refused():
+    """The refusal must survive the layout change too, or v5 users get silent
+    wrong math for unsupported rope types."""
+    from penzai_backend.loader import llama3_to_penzai
+
+    class _V5Yarn:
+        rope_parameters = {"rope_type": "yarn", "rope_theta": 500000.0, "factor": 8.0}
+
+    class _M:
+        config = _V5Yarn()
+
+    with pytest.raises(ValueError, match="(?i)yarn|not implemented"):
+        llama3_to_penzai(_M())

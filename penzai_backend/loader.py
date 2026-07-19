@@ -20,6 +20,18 @@ because the failure this module exists to prevent is a model that loads happily
 while computing different math than it was trained with.
 
 Verified end to end against HF PyTorch in tests/test_penzai_loader.py.
+
+TRANSFORMERS VERSION. `rope_settings` below reads both the 4.x and 5.x config
+layouts, because v5 moved rope_theta/rope_scaling into a single
+`rope_parameters` dict and reading only the old key would silently drop llama3
+scaling.
+
+But note penzai itself is NOT v5-ready: `llamalike_common.py:599` does
+`rope_wavelength=hf_config.rope_theta`, and that attribute no longer exists in
+v5. So conversion currently requires transformers 4.x. It fails with a plain
+AttributeError rather than doing something subtly wrong, which is the acceptable
+kind of failure -- but it does mean the penzai path and the steering sweep
+cannot share one environment today (societies-of-thought/.venv is on 5.x).
 """
 
 from __future__ import annotations
@@ -36,6 +48,38 @@ from penzai_backend.llama3_rope import Llama3RoPE
 # rope_types penzai handles natively once the base (rope_theta) is passed
 # through, which llamalike_common already does via rope_wavelength.
 _NO_SCALING_NEEDED = {None, "default"}
+
+
+def rope_settings(hf_config: Any) -> tuple[str | None, dict]:
+    """Return (rope_type, scaling_params) across transformers 4.x and 5.x.
+
+    The layout moved between major versions:
+
+        v4   config.rope_theta   = 500000.0
+             config.rope_scaling = {"rope_type": "llama3", "factor": 8.0, ...}
+
+        v5   config.rope_parameters = {"rope_type": "llama3",
+                                       "rope_theta": 500000.0,
+                                       "factor": 8.0, ...}
+             and rope_scaling / rope_theta no longer exist
+
+    Reading only `rope_scaling` means that under v5 rope_type comes back None,
+    the caller concludes there is no scaling to apply, and a Llama-3.1 model
+    converts WITHOUT llama3 frequencies -- silently. That is the same class of
+    bug as the HF Flax hardcoded base (docs/flax_rope_bug.md), reintroduced by a
+    dependency bump rather than by anyone writing wrong math.
+
+    Verified against the real DeepSeek-R1-Distill-Llama-8B config under
+    transformers 5.13.1 on 2026-07-19.
+    """
+    params = getattr(hf_config, "rope_parameters", None)
+    if isinstance(params, dict) and params:                 # transformers 5.x
+        scaling = dict(params)
+    else:                                                   # transformers 4.x
+        scaling = dict(getattr(hf_config, "rope_scaling", None) or {})
+
+    rope_type = scaling.get("rope_type") or scaling.get("type")
+    return rope_type, scaling
 
 
 def llama3_to_penzai(
@@ -60,8 +104,7 @@ def llama3_to_penzai(
       ValueError: if the config carries a rope_type we do not implement. Loading
         it anyway would produce a model that runs and is wrong.
     """
-    scaling = getattr(hf_model.config, "rope_scaling", None) or {}
-    rope_type = scaling.get("rope_type") or scaling.get("type")
+    rope_type, scaling = rope_settings(hf_model.config)
 
     if rope_type not in _NO_SCALING_NEEDED and rope_type != "llama3":
         raise ValueError(
