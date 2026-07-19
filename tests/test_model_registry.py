@@ -13,8 +13,9 @@ Three things differ per model, and each has burned us once:
                 resid_post and reconstruction proved the config right. Gemma states
                 `model.layers.N.output` unambiguously. The offset from "SAE layer" to
                 "layer whose output we hook" is therefore per-family.
-  layers        Gemma publishes residual SAEs at 16/31/40/41/53 only. Llama Scope
-                (slimpj) publishes layer 15 only.
+  layers        Gemma publishes resid_post SAEs at all 62 layers but Neuronpedia
+                LABELS at only 16/31/40/41/53 -- weights and labels are different,
+                non-nested sets. Llama Scope (slimpj) publishes layer 15 only.
 
 The registry is data, so a wrong entry fails as a test here rather than as a plausible
 number on a rented GPU.
@@ -60,10 +61,43 @@ def test_all_published_gemma_layers_resolve(layer):
     assert spec.layer == layer
 
 
-def test_gemma_layer_without_a_published_sae_raises():
-    """A dead layer must fail here, not silently download zero features on a GPU box."""
+def test_gemma_layer_out_of_range_raises():
+    """62 decoder blocks; layer 62 does not exist at all."""
     with pytest.raises(ValueError, match="(?i)not available"):
-        resolve_model("google/gemma-3-27b-it", layer=20)
+        resolve_model("google/gemma-3-27b-it", layer=62)
+
+
+def test_unlabelled_gemma_layer_resolves_for_steering_with_neuronpedia_none():
+    """Weights and labels are different sets. Gemma publishes resid_post SAEs at all
+    62 layers but explanations at only 5, so layer 20 IS steerable -- it just cannot
+    have its features chosen by description.
+
+    This used to raise, because resolve_model built a Neuronpedia source id
+    unconditionally. That blocked 57 steerable layers, which is the whole reason the
+    Gemma arm looked like it had 5 layers to sweep instead of 62."""
+    spec = resolve_model("google/gemma-3-27b-it", layer=20)
+    assert spec.layer == 20
+    assert spec.hook_layer == 20
+    assert spec.neuronpedia is None, (
+        "no published explanations at layer 20 -- record the absence rather than "
+        "raising, so steering still works"
+    )
+
+
+def test_labelled_gemma_layer_still_gets_its_source():
+    assert resolve_model("google/gemma-3-27b-it", layer=41).neuronpedia == (
+        "gemma-3-27b-it", "41-gemmascope-2-res-16k")
+
+
+def test_caller_errors_are_not_swallowed_by_the_no_labels_path():
+    """resolve_model catches NoLabelsPublished so unlabelled layers still resolve.
+    It must NOT catch bare ValueError -- an unknown model or a bad mixture is a
+    caller error, and swallowing it turns a typo into a silent no-op. This is the
+    same failure mode that hid a jlens bug behind `except Exception: continue`."""
+    with pytest.raises(ValueError, match="(?i)unknown model"):
+        resolve_model("mistralai/Mistral-7B-v0.3", layer=15)
+    with pytest.raises(ValueError, match="(?i)unknown mixture"):
+        resolve_model("deepseek-ai/DeepSeek-R1-Distill-Llama-8B", 15, mixture="nope")
 
 
 def test_unknown_model_raises_rather_than_guessing():

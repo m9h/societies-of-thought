@@ -15,7 +15,8 @@ wrong path":
     Gemma 3 27B IT              gemma-3-27b-it        16-gemmascope-2-res-16k
 
 Verified against the live S3 listing: gemma-3-27b-it has res SAEs only at layers
-16/31/40/41/53 (widths 16k/65k/262k), plus transcoders at every layer 0-61. Asking for
+16/31/40/41/53 (widths 16k/65k/262k) -- LABELS only; SAE weights exist at every
+layer 0-61, see tests/test_gemma_scope_layout.py. Asking for
 a res source at, say, layer 20 is a silent empty result -- so it must raise instead.
 """
 
@@ -28,7 +29,11 @@ sys.modules.setdefault("datasets", types.SimpleNamespace(load_dataset=None))
 
 import pytest
 
-from sot.sources import GEMMA3_27B_RES_LAYERS, neuronpedia_source
+from sot.sources import (
+    GEMMA3_27B_RES_LAYERS,
+    NoLabelsPublished,
+    neuronpedia_source,
+)
 
 
 def test_llama_scope_source_unchanged():
@@ -52,12 +57,21 @@ def test_every_advertised_gemma_layer_resolves(layer):
     assert src == f"{layer}-gemmascope-2-res-16k"
 
 
-def test_unavailable_gemma_layer_raises_instead_of_returning_a_dead_path():
-    """THE TRAP. Gemma 3 27B has res SAEs at 16/31/40/41/53 only. A request for layer 20
-    must fail loudly -- a dead S3 prefix downloads zero batches, which is indistinguishable
-    from 'this SAE has no labelled features'."""
-    with pytest.raises(ValueError, match="(?i)layer 20.*(not available|no res)"):
+def test_unlabelled_gemma_layer_raises_instead_of_returning_a_dead_path():
+    """THE TRAP. Gemma 3 27B exports EXPLANATIONS at 16/31/40/41/53 only. A request
+    for layer 20 must fail loudly -- a dead S3 prefix downloads zero batches, which is
+    indistinguishable from 'this SAE has no labelled features'.
+
+    Note this is about LABELS. Layer 20 does have SAE weights and is steerable; see
+    tests/test_gemma_scope_layout.py. The error type is specific so callers that can
+    proceed without labels catch it without also swallowing caller errors."""
+    with pytest.raises(NoLabelsPublished, match="(?i)layer 20.*no published"):
         neuronpedia_source("google/gemma-3-27b-it", layer=20, width="16k")
+
+
+def test_no_labels_is_a_ValueError_subclass():
+    """Keeps every existing `except ValueError` caller behaving as before."""
+    assert issubclass(NoLabelsPublished, ValueError)
 
 
 def test_unknown_model_raises():

@@ -20,7 +20,11 @@ each call site. Every one of these has cost us a wrong run at least once:
               paper's) exists at layer 15 only; the slimpj+openr1 "mixed" suite covers all
               32. Collapsing the two blocked 5 of the 6 layers in a sweep already running,
               so availability is a function of (model, mixture).
-              Gemma 3 27B: residual SAEs at 16/31/40/41/53 only.
+              Gemma 3 27B: resid_post SAEs at ALL 62 layers (four in the flagship
+              resid_post/ dir, the rest in resid_post_all/). Neuronpedia publishes
+              LABELS at only 16/31/40/41/53 -- a different, non-nested set. Using the
+              label set as weight-availability blocked 57 steerable layers and
+              greenlit layer 41, which the loader then rejects.
 
 Registry entries are data, so a wrong one fails in tests rather than as a plausible
 number on a rented GPU.
@@ -30,7 +34,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sot.sources import GEMMA3_27B_RES_LAYERS, neuronpedia_source
+from sot.sources import (
+    GEMMA_SCOPE_ALL_LAYERS,
+    NoLabelsPublished,
+    neuronpedia_source,
+)
 
 
 @dataclass(frozen=True)
@@ -39,7 +47,11 @@ class ModelSpec:
     layer: int
     sae_kind: str            # "llama_scope" | "gemma_scope"
     hook_layer: int          # layer whose OUTPUT we hook (resid_post)
-    neuronpedia: tuple[str, str]   # (neuronpedia_model_id, source_id)
+    # (neuronpedia_model_id, source_id), or None when this layer has SAE weights
+    # but no published explanations. Steering works there; selecting features by
+    # description does not. Callers that need labels must check and say so --
+    # see sot/features.py, which raises rather than downloading a dead prefix.
+    neuronpedia: tuple[str, str] | None
     d_model: int
     # Index of a KNOWN conversational feature in THIS model's SAE, or None.
     # 30939 is the paper's feature in Llama Scope; index 30939 in Gemma Scope is an
@@ -78,7 +90,12 @@ MODELS: dict[str, _Entry] = {
     ),
     "google/gemma-3-27b-it": _Entry(
         sae_kind="gemma_scope",
-        layers_by_mixture={"": GEMMA3_27B_RES_LAYERS},
+        # WEIGHTS, not labels. All 62 layers have a resid_post SAE (four in the
+        # flagship resid_post/ dir, the rest in resid_post_all/). This used to be
+        # the Neuronpedia LABEL set {16,31,40,41,53}, which both blocked 57 layers
+        # that are steerable and greenlit layer 41, which download_gemma_sae then
+        # rejected -- a contradiction that only fires once the model is on a GPU.
+        layers_by_mixture={"": GEMMA_SCOPE_ALL_LAYERS},
         default_layer=16,
         d_model=5376,
         anchor_feature=None,         # no known anchor; lexicon selector picks one
@@ -113,12 +130,20 @@ def resolve_model(model: str, layer: int | None = None, *, width: str = "16k",
         )
 
     kw = {"width": width} if entry.sae_kind == "gemma_scope" else {"mixture": mixture}
+    # A layer can have weights but no labels (Gemma publishes SAEs at all 62 layers
+    # and explanations at 5). That must not block steering, so record the absence
+    # instead of raising here -- feature selection is where it actually matters.
+    try:
+        np_source = neuronpedia_source(model, layer, **kw)
+    except NoLabelsPublished:
+        np_source = None
+
     return ModelSpec(
         model=model,
         layer=layer,
         sae_kind=entry.sae_kind,
         hook_layer=layer + entry.hook_offset,
-        neuronpedia=neuronpedia_source(model, layer, **kw),
+        neuronpedia=np_source,
         d_model=entry.d_model,
         anchor_feature=entry.anchor_feature,
     )

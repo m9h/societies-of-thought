@@ -30,11 +30,16 @@ import torch
 from huggingface_hub import hf_hub_download
 from safetensors.torch import load_file
 
+from sot.sources import gemma_sae_location
+
 GEMMA_SCOPE_REPOS = {
-    # model id -> (HF repo, layers with resid_post SAEs)
-    "google/gemma-3-27b-it": ("google/gemma-scope-2-27b-it", [16, 31, 40, 53]),
-    "google/gemma-3-27b-pt": ("google/gemma-scope-2-27b-pt", [16, 31, 40, 53]),
-    "google/gemma-3-12b-it": ("google/gemma-scope-2-12b-it", None),
+    # model id -> HF repo. Which LAYERS exist (and at which width/l0) is not a
+    # property of the repo alone: the flagship resid_post/ directory holds four
+    # layers with rich options, and resid_post_all/ holds all 62 with a narrower
+    # grid. sot.sources.gemma_sae_location owns that, so it lives in one place.
+    "google/gemma-3-27b-it": "google/gemma-scope-2-27b-it",
+    "google/gemma-3-27b-pt": "google/gemma-scope-2-27b-pt",
+    "google/gemma-3-12b-it": "google/gemma-scope-2-12b-it",
 }
 
 
@@ -113,14 +118,17 @@ def download_gemma_sae(
     model: str, layer: int, width: str = "16k", l0: str = "medium",
     cache_dir: str | Path | None = None, device: str = "cuda",
 ) -> GemmaScopeSAE:
-    """Fetch a resid_post SAE from the Gemma Scope repo and load it."""
+    """Fetch a resid_post SAE from the Gemma Scope repo and load it.
+
+    All 62 layers are available. Note that l0="medium" exists only for the four
+    flagship layers (16/31/40/53); every other layer needs "small" or "big".
+    gemma_sae_location raises on an impossible combination rather than letting
+    hf_hub_download 404 on a path we claimed was valid.
+    """
     if model not in GEMMA_SCOPE_REPOS:
         raise ValueError(f"no Gemma Scope repo registered for {model!r}")
-    repo, layers = GEMMA_SCOPE_REPOS[model]
-    if layers and layer not in layers:
-        raise ValueError(f"layer {layer} has no resid_post SAE; available: {layers}")
-
-    sub = f"resid_post/layer_{layer}_width_{width}_l0_{l0}"
+    repo = GEMMA_SCOPE_REPOS[model]
+    sub = gemma_sae_location(layer, width=width, l0=l0)
     files = {}
     for name in ("config.json", "params.safetensors"):
         files[name] = hf_hub_download(repo, f"{sub}/{name}", cache_dir=cache_dir)
