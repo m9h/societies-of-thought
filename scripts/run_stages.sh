@@ -111,10 +111,19 @@ main)
 # Uses the "mixed" SAE suite because it is the only one published for every
 # layer. Layer 15 is in both suites, so it doubles as a check that the effect
 # is not an artifact of the SAE's training mixture.
+#
+# The grid comes from sot.registry.layer_sweep_grid -- do NOT paste a literal
+# list here. This stage used to hardcode `9 12 15 18 21 24` while calibration on
+# disk covered 5/10/15/20/25/30 and the only completed rows were at layer 5:
+# three grids, none agreeing. Running it would have recalibrated five layers
+# from scratch and thrown away 572 rows already paid for.
+# tests/test_sweep_grid.py fails if a literal list reappears.
 # ---------------------------------------------------------------------------
 layers)
+  SWEEP_LAYERS="$(python -m sot.sweep_grid)"
+  echo "layer sweep grid: $SWEEP_LAYERS"
   python -m sot.run_sweep \
-    --tasks gpqa math_hard --layers 9 12 15 18 21 24 --mixture mixed \
+    --tasks gpqa math_hard --layers $SWEEP_LAYERS --mixture mixed \
     --n-candidates 3 --n-controls 3 --select-method neighbors \
     --alphas -2 2 \
     --n-problems 100 --max-new-tokens 8192 \

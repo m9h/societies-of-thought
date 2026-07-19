@@ -74,6 +74,9 @@ class _Entry:
     # offset from the SAE's layer index to the layer whose output we hook.
     # 0 for both families: resid_post(L) IS the output of layer L.
     hook_offset: int = 0
+    # Which layers the sweep probes. ONE source of truth -- scripts/run_stages.sh
+    # interpolates this rather than carrying its own list. See sweep_grid below.
+    sweep_grid: tuple[int, ...] = ()
 
 
 MODELS: dict[str, _Entry] = {
@@ -87,6 +90,12 @@ MODELS: dict[str, _Entry] = {
         default_layer=15,            # the paper's claimed mechanism site
         d_model=4096,
         anchor_feature=30939,        # the paper's conversational-surprise feature
+        # Spans 16%-94% of the 32 layers roughly uniformly. Deliberately NOT
+        # centred on layer 15: our weight analysis puts 15 at rank 21/32, and
+        # calibration already exists for exactly these six, so this grid is both
+        # the cheaper and the less question-begging choice. See
+        # tests/test_sweep_grid.py and docs/why_layers.md.
+        sweep_grid=(5, 10, 15, 20, 25, 30),
     ),
     "google/gemma-3-27b-it": _Entry(
         sae_kind="gemma_scope",
@@ -99,8 +108,28 @@ MODELS: dict[str, _Entry] = {
         default_layer=16,
         d_model=5376,
         anchor_feature=None,         # no known anchor; lexicon selector picks one
+        # Constrained by LABELS, not weights. Steering works at all 62 layers,
+        # but our feature selection reads Neuronpedia explanations, which exist
+        # only at these five. Sweeping an unlabelled layer would mean picking
+        # features some other way -- a different experiment, not a wider one.
+        sweep_grid=(16, 31, 40, 41, 53),
     ),
 }
+
+
+def layer_sweep_grid(model: str) -> tuple[int, ...]:
+    """The layers the sweep probes for this model. One source of truth.
+
+    scripts/run_stages.sh interpolates this via `python -m sot.sweep_grid`
+    instead of carrying its own list -- three copies of the grid is exactly how
+    the script, the calibration on disk and the completed rows came to disagree.
+    """
+    entry = MODELS.get(model)
+    if entry is None:
+        raise ValueError(f"unknown model {model!r}; register it in sot/registry.py")
+    if not entry.sweep_grid:
+        raise ValueError(f"no sweep grid defined for {model!r}")
+    return entry.sweep_grid
 
 
 def resolve_model(model: str, layer: int | None = None, *, width: str = "16k",

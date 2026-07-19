@@ -164,6 +164,34 @@ isn't an artifact of the SAE's training mixture.
 That is the experiment that turns "the paper's claim fails" into "the claim fails *and we
 looked everywhere it could have been true*."
 
+### Which layers, exactly, and why not clustered on 15
+
+The grid is **5, 10, 15, 20, 25, 30**, defined once in `sot.registry.layer_sweep_grid`
+and interpolated into the shell script via `python -m sot.sweep_grid`.
+
+It spans 16%–94% of the 32 layers roughly uniformly. That uniformity is the point. An
+earlier version of the script asked for `9 12 15 18 21 24` — entirely inside the middle
+half, centred on the paper's layer. That grid can only ever answer "is the effect near
+15?", which assumes the thing under test. Two independent signals say don't assume it:
+our own weight analysis puts layer 15 at **rank 21 of 32** by distillation delta, and the
+2026 activation-steering literature puts the usual sweet spot nearer **75% depth**
+(layers 24–28 here), which the old grid barely reached and the new one covers.
+
+It is also the cheaper grid: calibration already exists on disk for exactly these six
+(`results/steering/feature_stats_L{5,10,15,20,25,30}_mixed.json`), and the 572 completed
+rows are at layer 5. The rejected grid had calibration for layer 15 only.
+
+One caveat worth stating plainly, from the 2026 layer-importance literature
+(arXiv:2604.24938, 2605.27786, 2602.01997): which layers look important depends on the
+**calibration corpus**, the **architecture**, and the **task**. Layer importance is not an
+intrinsic fingerprint of a model. So this grid tells us where the effect is *for these
+tasks under this calibration*, and that qualifier belongs on any result we report from it.
+
+For Gemma 3 27B the grid is **16, 31, 40, 41, 53** — constrained not by SAE availability
+(weights exist at all 62 layers) but by Neuronpedia *labels*, since feature selection reads
+explanations. Steering an unlabelled layer would mean choosing features some other way,
+which is a different experiment rather than a wider one. See `sot/sources.py`.
+
 ---
 
 ## 6. A related dissociation, at the level above
