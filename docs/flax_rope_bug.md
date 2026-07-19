@@ -1,7 +1,54 @@
 # HF Flax Llama computes the wrong RoPE for Llama-3 models
 
-**Status:** code-level finding, verified 2026-07-18. Empirical confirmation
-(logits diff vs PyTorch) is the outstanding step — see "How to confirm" below.
+**Status:** mechanism CONFIRMED empirically 2026-07-18. Magnitude on real
+trained weights is NOT yet measured — see "Measured magnitude" below before
+acting on this.
+
+## Empirical confirmation
+
+Tiny random-init Llama (2 layers, d=64), identical weights loaded into
+PyTorch `LlamaForCausalLM` and `FlaxLlamaForCausalLM`, transformers 4.57.6 /
+jax 0.11.0 / flax 0.12.7 — the same versions as `~/Workspace/jlens-jax/.venv`.
+Relative max logit difference:
+
+    case                                        rel. diff    verdict
+    CONTROL rope_theta=10000 (Flax's hardcode)   2.5e-07     AGREE
+    rope_theta=500000 (Llama-3.1 real value)     2.3e-03     DIVERGE
+    rope_theta=500000 + rope_scaling=llama3      2.3e-03     DIVERGE
+
+The control is what makes this interpretable. At the base Flax hardcodes, the
+two backends agree to numerical noise — so weight conversion, dtype and masking
+are all correct, and the divergence at 500000 is attributable to the rotary base
+alone and nothing else. The mechanism is not in doubt: **Flax ignores
+`config.rope_theta`, and ignores `rope_scaling` on top of it** (adding llama3
+scaling changes the diff not at all, because it is being ignored too).
+
+## Measured magnitude — and why it is a floor, not an estimate
+
+Scaling with sequence length (same setup):
+
+    seq_len    control      real θ=500k    ratio
+        16     2.5e-07        3.4e-03     13385x
+        64     3.6e-07        7.4e-03     20664x
+       256     2.7e-07        6.4e-03     24063x
+      1024     3.1e-07        6.4e-03     20625x
+      4096     4.5e-07        6.4e-03     14438x
+
+The error saturates near 6e-03 relative rather than growing without bound. In
+isolation, 0.6% is not obviously fatal, and an earlier draft of this document
+overstated the case by calling every downstream result "invalid". That was not
+supported by this evidence.
+
+But 0.6% is a **floor**, not an estimate of the real effect, for one reason: this
+is a *randomly initialised* model. Random weights have no learned dependence on
+positional structure, so perturbing the positional encoding barely moves them. A
+trained model has spent its entire optimisation budget learning features that
+key off specific rotary phases. The honest summary is: the mechanism is certain,
+the magnitude on DeepSeek-R1-Distill-Llama-8B is unmeasured and expected to be
+larger than 0.6%, possibly by a lot.
+
+**Measuring it on real weights is the outstanding task** and needs the HF cache
+permission fix (`scripts/fix_hf_cache_perms.sh`) to run on the Spark.
 
 **Who this affects:** anything using `jlens-jax` (or any HF-Flax path) on a
 Llama-3-family model. That includes `deepseek-ai/DeepSeek-R1-Distill-Llama-8B`,
