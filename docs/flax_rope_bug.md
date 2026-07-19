@@ -133,12 +133,24 @@ source rather than observing an output.
    `rope_theta` and apply llama3 rescaling. Smallest change, but it means
    monkeypatching a deprecated code path in a frozen dependency branch
    (`transformers<5`, since v5 removed Flax entirely).
-2. **Move the backend to penzai** — see `spikes/penzai_backend_spike.py`, which
-   shows penzai can satisfy `jlens_jax/protocol.py`'s
-   `forward_with_intermediates` contract, with RoPE injectable by type via
-   `pz.select(...).at_instances_of(ApplyRoPE)`. Penzai needs the same ~40 lines
-   of llama3 RoPE, but it is not on a removed code path and it fails loudly
-   rather than silently.
+2. **Move the backend to penzai** — ✅ **now implemented and validated.**
+   `penzai_backend/llama3_rope.py` provides the frequency rescale (verified
+   against transformers' own `ROPE_INIT_FUNCTIONS["llama3"]`), and
+   `penzai_backend/loader.py` converts a Llama-3.1 checkpoint by calling
+   penzai's inner converter and injecting the RoPE via `pz.select` — no fork.
+
+   **Agreement with HF PyTorch: rel 3.7e-07** on a tiny Llama-3.1-config model
+   at 512 and 4096 tokens. Mutation-checked: a loader that skips the RoPE swap
+   scores 8.6e-04 and is correctly rejected (`spikes/mutation_check_loader.py`).
+
+   Note the contrast this makes concrete. Same model, same rotary problem:
+
+       HF Flax     loads happily, wrong RoPE, no warning
+       penzai      refuses to load until the scaling is implemented
+
+   Once implemented, penzai matches PyTorch to 3.7e-07 — four orders of
+   magnitude better than the 6e-03 the Flax path is stuck at. Strictness was
+   the asset.
 3. **Stay on PyTorch `jlens`** for Llama-3-family work and use the JAX port only
    where it has been validated.
 
