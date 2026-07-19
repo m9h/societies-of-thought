@@ -2,7 +2,7 @@
 #SBATCH --job-name=sot-layer-sweep
 #SBATCH --output=results/slurm-%j.out
 #SBATCH --error=results/slurm-%j.err
-#SBATCH --mem=96G
+#SBATCH --mem=64G
 #SBATCH --time=24:00:00
 #
 # Layer sweep on the DGX Spark, under Slurm with a HARD memory cap.
@@ -33,6 +33,40 @@
 
 set -euo pipefail
 cd "${SLURM_SUBMIT_DIR:-$(dirname "$0")/..}"
+
+# PREFLIGHT: Slurm's accounting is not sufficient on this box.
+#
+# Two gaps, both observed on 2026-07-19:
+#   1. Other projects and agents run OUTSIDE Slurm (the queue was empty while a
+#      cell-tracking job held 22GB and a wwj benchmark held ~10GB). Slurm counts
+#      that memory as free and will happily admit this job on top of it.
+#   2. GB10 unified memory means a GPU allocation is a HOST allocation, but it
+#      shows up in neither Slurm's accounting nor RSS -- that same job read as
+#      22GB in nvidia-smi and 2.9GB in ps.
+#
+# So --mem is necessary but not sufficient. Check the real numbers and refuse to
+# start if the box is already loaded, because a GPU OOM here is a system OOM: it
+# wedges the host rather than killing this process.
+NEED_GB="${NEED_GB:-60}"
+avail_gb=$(free -g | awk '/^Mem:/ {print $7}')
+gpu_used_gb=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits 2>/dev/null \
+              | awk '{s+=$1} END {print int(s/1024)}')
+gpu_used_gb=${gpu_used_gb:-0}
+
+echo "preflight   : ${avail_gb}GB host available, ${gpu_used_gb}GB GPU already in use"
+if [ "${avail_gb:-0}" -lt "$NEED_GB" ]; then
+    echo "ABORT: only ${avail_gb}GB available, need ${NEED_GB}GB." >&2
+    echo "Something outside Slurm is using the box. Check:" >&2
+    ps -eo pid,etime,rss,args --sort=-rss --no-headers 2>/dev/null | head -5 >&2
+    nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv >&2
+    exit 1
+fi
+if [ "$gpu_used_gb" -gt 8 ]; then
+    echo "ABORT: ${gpu_used_gb}GB of GPU memory already allocated by another process." >&2
+    echo "On GB10 that is host memory too. Refusing to contend." >&2
+    nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv >&2
+    exit 1
+fi
 
 # HF CACHE. ~/.cache/huggingface/hub is owned by root (created Jul 1 by
 # something running as root), so model downloads there fail with a
