@@ -62,8 +62,14 @@ IMAGE = os.environ.get(
 # GPU availability on RunPod changes hour to hour -- a hardcoded type fails hard with
 # "no longer any instances available". GPU= overrides the profile without editing it.
 #   GPU="A100 PCIe" POD=jlens python scripts/runpod.py up
-GPU_TYPE = os.environ.get("GPU") or PROFILES[POD_NAME]["gpu"]
-DISK_GB = PROFILES[POD_NAME]["disk"]
+#
+# An unknown POD name used to KeyError, so a second concurrent pod could not be started
+# without editing this file. Unknown names now fall back to a default profile, which is
+# what GPU=/DISK= are for.
+_DEFAULT = {"gpu": "A100 PCIe", "disk": 80}
+_profile = PROFILES.get(POD_NAME, _DEFAULT)
+GPU_TYPE = os.environ.get("GPU") or _profile["gpu"]
+DISK_GB = int(os.environ.get("DISK") or _profile["disk"])
 
 
 def _key() -> str:
