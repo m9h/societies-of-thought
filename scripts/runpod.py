@@ -33,6 +33,13 @@ PROFILES = {
     "sweep": {"gpu": "H100 PCIe", "disk": 80},
     # 3B PPO (actor + critic + reference + optimizer states): buy VRAM, not bandwidth.
     "rl": {"gpu": "A100 PCIe", "disk": 120},
+    # One pod per ARM for the Claim B A/B, each running its 3 seeds sequentially.
+    # Measured 167s/step at 48 prompts/step on A100 80GB, so 150 steps ~= 7h/run,
+    # ~21h per arm. Three arms in parallel rather than nine pods: same GPU-hours,
+    # three things to monitor instead of nine.
+    "rl-baseline": {"gpu": "A100 PCIe", "disk": 120},
+    "rl-dialogue": {"gpu": "A100 PCIe", "disk": 120},
+    "rl-monologue": {"gpu": "A100 PCIe", "disk": 120},
     # Jacobian-lens fitting on an 8B model: modest, cheapest GPU that fits it.
     "jlens": {"gpu": "H100 PCIe", "disk": 80},
 }
