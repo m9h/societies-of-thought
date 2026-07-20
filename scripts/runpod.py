@@ -40,7 +40,10 @@ PROFILES = {
 # H100 PCIe: 80GB, ~2TB/s memory bandwidth (~7x the Spark). The 8B model plus SAE is
 # ~18GB, so VRAM is not the constraint -- decode throughput is.
 IMAGE = "runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04"
-GPU_TYPE = PROFILES[POD_NAME]["gpu"]
+# GPU availability on RunPod changes hour to hour -- a hardcoded type fails hard with
+# "no longer any instances available". GPU= overrides the profile without editing it.
+#   GPU="A100 PCIe" POD=jlens python scripts/runpod.py up
+GPU_TYPE = os.environ.get("GPU") or PROFILES[POD_NAME]["gpu"]
 DISK_GB = PROFILES[POD_NAME]["disk"]
 
 
