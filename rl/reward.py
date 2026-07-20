@@ -51,6 +51,23 @@ def format_reward(completion: str, strict: bool = False) -> float:
     return 1.0 if (has_think and len(answers) == 1) else 0.0
 
 
+def grade_completion(completion: str, target: int, nums: list[int]):
+    """THE single scoring entry point. Both the reward and the eval must use this.
+
+    They diverged once and it inverted a result: the reward path normalised
+    <group_consensus> into <answer>, the eval path did not, and the dialogue arm
+    scored 0.40 reward while its eval reported 0.0% accuracy and 0.0% parse rate.
+    Reported as-is that becomes a confident "monologue beats dialogue" finding
+    which is purely an artifact of which code path could parse which format.
+
+    The docstring of accuracy_reward below already warned about exactly this and
+    the eval path was written with the bug anyway, so the defence cannot be a
+    comment -- it has to be that there is only one function.
+    """
+    gold = f"{target}|{','.join(map(str, nums))}"
+    return grade("countdown", _normalise_answer_container(completion), gold)
+
+
 def accuracy_reward(completion: str, target: int, nums: list[int]) -> float:
     """1.0 iff the stated equation uses each number once and evaluates to the target.
 
@@ -64,8 +81,7 @@ def accuracy_reward(completion: str, target: int, nums: list[int]) -> float:
     container FIRST, then grade. Note this only changes where we LOOK for the answer;
     the arithmetic is still judged by the shared grader, and a wrong equation stays wrong.
     """
-    gold = f"{target}|{','.join(map(str, nums))}"
-    return 1.0 if grade("countdown", _normalise_answer_container(completion), gold).correct else 0.0
+    return 1.0 if grade_completion(completion, target, nums).correct else 0.0
 
 
 def _normalise_answer_container(completion: str) -> str:

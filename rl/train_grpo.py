@@ -41,7 +41,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, TrainerCallback  #
 from peft import LoraConfig  # noqa: E402
 from trl import GRPOConfig, GRPOTrainer, SFTConfig, SFTTrainer  # noqa: E402
 
-from rl.reward import countdown_reward, format_reward  # noqa: E402
+from rl.reward import countdown_reward, format_reward, grade_completion  # noqa: E402
 from rl.grpo_config import check_grpo_config
 from sot.grade import grade  # noqa: E402
 
@@ -124,7 +124,10 @@ class EvalAndLog:
             out = model.generate(**enc, max_new_tokens=400, do_sample=False,
                                  pad_token_id=self.tok.pad_token_id)
             text = self.tok.decode(out[0][enc["input_ids"].shape[1]:], skip_special_tokens=True)
-            g = grade("countdown", text, f"{row['target']}|{','.join(map(str, row['nums']))}")
+            # grade_completion, NOT grade: the eval must normalise dialogue answer
+            # containers exactly as the reward does, or the dialogue arm reports 0%
+            # while actually scoring 0.4 reward. See rl/reward.py.
+            g = grade_completion(text, row["target"], row["nums"])
             correct += g.correct
             parsed += g.parsed
             toks += int((out[0] != self.tok.pad_token_id).sum()) - enc["input_ids"].shape[1]
