@@ -2,6 +2,7 @@
 #SBATCH --job-name=sot-rl-smoke
 #SBATCH --output=results/rl-smoke-%j.out
 #SBATCH --error=results/rl-smoke-%j.err
+#SBATCH --gres=gpu:1
 #SBATCH --mem=48G
 #SBATCH --time=02:00:00
 #

@@ -2,6 +2,7 @@
 #SBATCH --job-name=sot-layer-sweep
 #SBATCH --output=results/slurm-%j.out
 #SBATCH --error=results/slurm-%j.err
+#SBATCH --gres=gpu:1
 #SBATCH --mem=64G
 #SBATCH --time=24:00:00
 #
