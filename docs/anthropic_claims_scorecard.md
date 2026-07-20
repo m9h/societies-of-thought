@@ -85,15 +85,27 @@ critical path, and the llama3 RoPE work does not transfer.
 
 ---
 
-## Claims 7 and 8 — the cheapest untested pair
+## Claims 7 and 8 — resolved against the source
 
-Bottleneck and broadcast-back are what make a global workspace a *workspace*
-rather than a bottleneck with good PR. Both are marked ⚠️ because I am not
-confident the paper states them in the form recorded here; check before building.
+Both were reconstructed from memory and both were wrong in ways that mattered.
+The GWT agent checked them against the paper on 2026-07-19:
 
-If they hold up as stated, they may be testable on published lens files alone —
-the distance-only null already runs with no GPU. Worth scoping before spending
-anything, since "no GPU" is a very different price than the ladder.
+**Claim 7 is capacity limitation, and the paper gives numbers**: the workspace
+carries *"never more than 10%"* of total activation variance and holds *"on the
+order of tens of concepts at a time"*. Those are falsifiable on published lens
+files plus a forward pass — no fitting, no GPU-hours. That makes it the cheapest
+open claim on the board, cheaper than the ladder by orders of magnitude.
+
+**Claim 8 is not a claim.** The paper concedes it: *"there are no obviously
+separable input processors, and the broadcast we document occurs within a single
+feedforward pass rather than through recurrent loops."* There is nothing to
+refute. Had this file kept my reconstruction, we would have spent effort
+attacking a position the authors had already disclaimed — which is the specific
+failure a scorecard is supposed to prevent, arriving through the scorecard.
+
+The lesson generalises: a claims inventory built from our own responses to a
+paper reproduces our own misreadings with extra confidence. Rows only count once
+someone has quoted the source.
 
 ---
 
