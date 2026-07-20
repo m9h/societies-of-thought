@@ -314,3 +314,52 @@ is the outcome I will thank you for.**
 - If a gate fails, **say so and stop.** A negative, honest result here is worth more
   than a positive one that does not replicate — this whole project exists because a
   high-profile paper's central causal claim was never tested outside one toy task.
+
+---
+
+## Harness status, 2026-07-19: the loop turns over
+
+First end-to-end execution of `rl/train_grpo.py`. It had never run before, and
+four bugs had already been found and fixed in it, so a fifth was the expectation.
+There isn't one.
+
+```
+config OK: 4 prompts per optimizer step (8 completions x 2 accum / 4 generations)
+step    0  acc=0.0%  parse=100.0%  tok=183
+```
+
+Verified working: argparse → config guard → Countdown dataset load → model
+download (via `HF_HOME=/mnt/t9/hf-cache`) → weight load → GRPOTrainer
+construction → rollout → reward → optimiser step → eval callback, with all three
+diagnostic series (`val_accuracy`, `parse_rate`, `mean_completion_tokens`)
+reporting.
+
+`acc=0.0%` at step 0 is correct for an untrained base model on Countdown, and
+`parse=100%` says the model emits well-formed output — so the grader is seeing
+real completions, not failing to parse them. Those two together are what make the
+zero meaningful rather than ambiguous.
+
+**The only blocker is vLLM**, exactly as the harness's own comment predicted:
+with `--no-vllm`, HF generate could not complete 3 steps in 8 minutes. That is
+the documented order-of-magnitude penalty, and it is the difference between a
+1-day and a 10-day A/B across 3 arms × 3 seeds. vLLM 0.25.1 resolves for aarch64.
+
+### What was NOT established
+
+- Nothing about learning. Three steps is not an experiment; do not read the
+  accuracy.
+- Claim B needs the dialogue/monologue arms, which need `rl/data/*_train.json`
+  from `generate_sft.py`. Only `baseline` (Claim A) was exercised.
+- No seeds, no spread. The paper's headline is a step-40 gap, which is exactly
+  where seed noise is largest — hence ≥3 seeds per arm before anything is
+  claimed.
+
+### Two environment facts worth carrying
+
+- `HF_HOME` must point at `/mnt/t9/hf-cache`. `~/.cache/huggingface/hub` is
+  root-owned, and the token lives in the *old* cache, so it has to be carried
+  across or transformers reports a public repo as "not a valid model identifier".
+- Slurm accounting is **disabled** on the Spark (`sacct` returns "accounting
+  storage is disabled"). A failed job leaves zero-byte output and no post-mortem
+  record — job 1725 vanished exactly that way. Prefer running under a logfile you
+  control until that changes.
