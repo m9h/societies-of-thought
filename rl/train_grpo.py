@@ -42,6 +42,7 @@ from peft import LoraConfig  # noqa: E402
 from trl import GRPOConfig, GRPOTrainer, SFTConfig, SFTTrainer  # noqa: E402
 
 from rl.reward import countdown_reward, format_reward  # noqa: E402
+from rl.grpo_config import check_grpo_config
 from sot.grade import grade  # noqa: E402
 
 PROMPT = (
@@ -179,6 +180,18 @@ def main() -> None:
                          "of NOT penalising dialogue scaffolding")
     ap.add_argument("--out", type=Path, default=Path("rl/runs"))
     args = ap.parse_args()
+
+    # Fail on a configuration that would train without learning BEFORE loading a
+    # model or touching a GPU. GRPO's advantage is computed within a prompt's
+    # group, so num_generations=1 gives a zero gradient and one-prompt-per-step
+    # gives a within-puzzle comparison -- neither raises on its own, and both
+    # look like a learning-rate problem after eight hours. See rl/grpo_config.py.
+    n_prompts_per_step = check_grpo_config(
+        batch_size=args.batch_size, grad_accum=args.grad_accum,
+        num_generations=args.num_generations)
+    print(f"  config OK: {n_prompts_per_step} prompts per optimizer step "
+          f"({args.batch_size} completions x {args.grad_accum} accum / "
+          f"{args.num_generations} generations)")
 
     run_name = f"{args.arm}_seed{args.seed}"
     run_dir = args.out / run_name
