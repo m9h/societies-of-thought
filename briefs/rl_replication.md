@@ -363,3 +363,42 @@ the documented order-of-magnitude penalty, and it is the difference between a
   storage is disabled"). A failed job leaves zero-byte output and no post-mortem
   record — job 1725 vanished exactly that way. Prefer running under a logfile you
   control until that changes.
+
+### Infrastructure facts, corrected 2026-07-19
+
+Two things I asserted and got wrong, recorded because both would waste someone's
+time again.
+
+**The RunPod API key is not revoked.** It returns 403 from the workstation and
+HTTP 200 from the Spark, with either auth method (`?api_key=` or a Bearer
+header). Whatever the restriction is -- origin, region, network -- it is not the
+key. Run all RunPod operations from the Spark. I spent a message telling the user
+to mint a new key that did not need minting.
+
+**vLLM works on the GB10.** The failure
+
+    RuntimeError: Device string must not be empty     (vllm/config/device.py)
+
+reads as an aarch64/Blackwell incompatibility and is not one. This node declares
+`Gres=gpu:gb10:1`, and neither sbatch script requested `--gres=gpu:1`, so Slurm
+allocated CPU only and vLLM correctly reported no device. Queried outside Slurm
+the platform resolves fine (NvmlCudaPlatform, device_type='cuda', NVIDIA GB10,
+sm_121). With the GPU actually requested, vLLM loads Qwen2.5-3B and generates.
+
+That one was close. Had the probe run inside GRPOTrainer as originally planned,
+the same missing GPU would have surfaced deep in TRL's vLLM setup, where "vLLM
+does not support aarch64" is an entirely plausible reading -- and would have
+moved the RL work to RunPod for a reason that did not exist. Isolating the risky
+dependency before composing it is what caught it.
+
+It is also the likeliest explanation for job 1725 exiting with zero-byte stdout
+AND stderr: `sacct` accounting is disabled on this node, so a job that dies for
+want of a resource leaves nothing to read.
+
+**Throughput, measured rather than assumed.** On GB10 with vLLM, generation runs
+~100-130 tok/s for Qwen2.5-3B. The real config is 384 completions/step, so the
+Spark is not a viable host for the full A/B -- hence RunPod A100. The harness's
+own "1 day for 3 arms x 3 seeds" estimate assumed a datacentre GPU.
+
+The Spark still earned its keep: every harness bug was found there at zero GPU
+cost before a single paid hour was spent.
