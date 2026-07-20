@@ -39,7 +39,19 @@ PROFILES = {
 
 # H100 PCIe: 80GB, ~2TB/s memory bandwidth (~7x the Spark). The 8B model plus SAE is
 # ~18GB, so VRAM is not the constraint -- decode throughput is.
-IMAGE = "runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04"
+IMAGE = os.environ.get(
+    "IMAGE", "runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04")
+# DRIVER CEILING, learned the expensive way 2026-07-19. RunPod A100 PCIe hosts
+# were on driver 570.133.20 = CUDA 12.8. `pip install vllm` pulls the current
+# build, which wants torch 2.11+cu130, and that fails at import with
+#
+#   RuntimeError: The NVIDIA driver on your system is too old (found version 12080)
+#
+# The image SHIPS a working torch (2.4.1+cu124); our own install is what breaks
+# it, so the failure looks like a pod problem rather than something we did. The
+# working combination on that driver is `vllm==0.11.0` -> torch 2.8.0+cu128.
+# Check `nvidia-smi --query-gpu=driver_version` on a new pod before installing,
+# and pin vLLM to match rather than letting the resolver choose.
 # GPU availability on RunPod changes hour to hour -- a hardcoded type fails hard with
 # "no longer any instances available". GPU= overrides the profile without editing it.
 #   GPU="A100 PCIe" POD=jlens python scripts/runpod.py up
