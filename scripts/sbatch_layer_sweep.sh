@@ -50,11 +50,17 @@ cd "${SLURM_SUBMIT_DIR:-$(dirname "$0")/..}"
 # wedges the host rather than killing this process.
 NEED_GB="${NEED_GB:-60}"
 avail_gb=$(free -g | awk '/^Mem:/ {print $7}')
-gpu_used_gb=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits 2>/dev/null \
+# NOT --query-gpu=memory.used: on GB10 unified memory that returns "[N/A]", which
+# parses to 0 and makes this guard read an idle GPU no matter how busy it is.
+# --query-compute-apps reports real per-process usage on this hardware; utilization
+# is the backstop for a process holding the GPU without much memory.
+gpu_used_gb=$(nvidia-smi --query-compute-apps=used_memory --format=csv,noheader,nounits 2>/dev/null \
               | awk '{s+=$1} END {print int(s/1024)}')
 gpu_used_gb=${gpu_used_gb:-0}
+gpu_util=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits 2>/dev/null | head -1)
+gpu_util=${gpu_util:-0}
 
-echo "preflight   : ${avail_gb}GB host available, ${gpu_used_gb}GB GPU already in use"
+echo "preflight   : ${avail_gb}GB host available, ${gpu_used_gb}GB GPU in use, ${gpu_util}% GPU util"
 if [ "${avail_gb:-0}" -lt "$NEED_GB" ]; then
     echo "ABORT: only ${avail_gb}GB available, need ${NEED_GB}GB." >&2
     echo "Something outside Slurm is using the box. Check:" >&2
@@ -62,7 +68,7 @@ if [ "${avail_gb:-0}" -lt "$NEED_GB" ]; then
     nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv >&2
     exit 1
 fi
-if [ "$gpu_used_gb" -gt 8 ]; then
+if [ "$gpu_used_gb" -gt 8 ] || [ "${gpu_util:-0}" -gt 50 ]; then
     echo "ABORT: ${gpu_used_gb}GB of GPU memory already allocated by another process." >&2
     echo "On GB10 that is host memory too. Refusing to contend." >&2
     nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv >&2

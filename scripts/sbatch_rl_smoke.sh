@@ -43,11 +43,17 @@ mkdir -p "$HF_HOME" results
 
 NEED_GB="${NEED_GB:-40}"
 avail_gb=$(free -g | awk '/^Mem:/ {print $7}')
-gpu_used_gb=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits 2>/dev/null \
+# NOT --query-gpu=memory.used: on GB10 unified memory that returns "[N/A]", which
+# parses to 0 and makes this guard read an idle GPU no matter how busy it is.
+# --query-compute-apps reports real per-process usage on this hardware; utilization
+# is the backstop for a process holding the GPU without much memory.
+gpu_used_gb=$(nvidia-smi --query-compute-apps=used_memory --format=csv,noheader,nounits 2>/dev/null \
               | awk '{s+=$1} END {print int(s/1024)}')
 gpu_used_gb=${gpu_used_gb:-0}
-echo "preflight   : ${avail_gb}GB host available, ${gpu_used_gb}GB GPU in use"
-if [ "${avail_gb:-0}" -lt "$NEED_GB" ] || [ "$gpu_used_gb" -gt 8 ]; then
+gpu_util=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits 2>/dev/null | head -1)
+gpu_util=${gpu_util:-0}
+echo "preflight   : ${avail_gb}GB host available, ${gpu_used_gb}GB GPU in use, ${gpu_util}% GPU util"
+if [ "${avail_gb:-0}" -lt "$NEED_GB" ] || [ "$gpu_used_gb" -gt 8 ] || [ "${gpu_util:-0}" -gt 50 ]; then
     echo "ABORT: box is loaded. Other projects run outside Slurm here." >&2
     nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv >&2
     exit 1
