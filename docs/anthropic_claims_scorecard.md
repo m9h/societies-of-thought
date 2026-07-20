@@ -21,13 +21,13 @@ the way the paper states them.
 | # | Claim | Status | Evidence |
 |---|---|---|---|
 | 1 | The Jacobian lens reads out something real, not an artifact of the projection | **REPLICATED — a point FOR them** | Randomization control passes: random blocks read out nothing. `HANDOFF.md` finding 4 |
-| 2 | Interpretable features emerge in J-space (the ASCII-face / "nose" demo) | **REPLICATED at scale** | Reproduces at Qwen3.5-27B (rank 2, semantic cluster), absent below → sharp threshold 14B→27B |
+| 2 | Interpretable features emerge in J-space (the ASCII-face / "nose" demo) | **REPLICATED — but the demo is one prompt** | Reproduces at Qwen3.5-27B (rank 2, semantic cluster) and nowhere else. NOT a sharp threshold: the 102-prompt `association` eval gives a smooth rise where a *dense* 32B beats the 27B hybrid. See claim 3 — this row previously contradicted it |
 | 3 | That emergence is *architectural* (hybrid/Mamba-like models show it) | **REFUTED** | It is gradual and **scale**-driven. The one positive model was simultaneously biggest, only hybrid, most capable. `HANDOFF.md` finding 3, self-corrected |
 | 4 | Tripartite CKA structure in J-space is a global-workspace signature | **PARTLY REFUTED** | Mostly smooth drift; real excess only ≥20B. Raw blockiness 0.08→0.29 looked real but a distance-only null reproduced 79–91% of it |
 | 5 | `pass@k` is a valid metric for feature emergence | **REFUTED** | The metric rewards noise. `HANDOFF.md` finding 2 |
 | 6 | Post-training shaped the J-space to reflect a *point of view* rather than pure prediction | **UNTESTED — and until 2026-11 untestable** | Needs base + post-trained checkpoints of one model. AI2's OLMo-3 published twelve. **This is the open one.** |
-| 7 | ⚠️ The workspace has an information *bottleneck* | **UNTESTED** | Flagged as a crux in the Butlin/Long scorecard framing |
-| 8 | ⚠️ The workspace *broadcasts back* to the rest of the network | **UNTESTED** | The other crux. Broadcast-back is what distinguishes a global workspace from a bottleneck |
+| 7 | The workspace is **capacity-limited** | **UNTESTED — but the paper gives numbers** | ✅ Verified in the source: *"never more than 10%"* of total activation variance; *"holds on the order of tens of concepts at a time"*. Checkable on published lens files + a forward pass. No longer ⚠️ |
+| 8 | The workspace *broadcasts back* to the rest of the network | **NOT CLAIMED — the paper concedes it** | ✅ Verified: *"there are no obviously separable input processors, and the broadcast we document occurs within a single feedforward pass rather than through recurrent loops."* Nothing to refute; do not spend on it |
 | 9 | Conversational/SAE features align with the J-space workspace | **REFUTED (our own prediction)** | We pre-registered that they would. They don't. `FINDINGS.md` §8 |
 
 ---
