@@ -65,8 +65,16 @@ spotted the confound in the other's design and missed it in our own.
 **Design constraints already settled:**
 - Fixed prompt count (616), not fit-to-convergence — a convergence check can't be
   sharded, and arms converging at different counts aren't strictly comparable.
-- `validate_fit` gate against the published anchor (mean cosine ≥ 0.95) must pass
-  before the other eleven are fitted.
+- `validate_fit` gate against the published anchor must pass before the other
+  eleven are fitted. **Cosine is not the gate** — the GWT agent showed a
+  100-prompt under-fit still scores 0.96, so cosine alone can never fail. The
+  real check is `identity_distance` = ‖J_L − I‖ at the **last source layer**
+  (0.220851 for the OLMo lens, matching Anthropic's published
+  `final_identity_distance` to 6 digits). That check had a bug — it averaged over
+  layers (0.767) and so *false-failed the published lens against itself* (247%
+  error, `pass: False`). Fixed in `jlens-lab` `962a071`; **pull + reinstall
+  before trusting any anchor.** The gate now passes the published lens against
+  itself on both checks.
 - Capability measured per arm *before* fitting. If capability turns out collinear
   with domain, that changes what the experiment can conclude — a two-hour finding
   that would otherwise cost 40 GPU-hours to discover afterwards.
@@ -74,8 +82,15 @@ spotted the confound in the other's design and missed it in our own.
   matched-capability null. Report excess over the null, never the raw number.
 
 **Cost.** The Jacobian accumulates as a plain sum over prompts divided by count,
-so sharding across containers is exact. On Modal: ~27 GPU-hours at
-`layer_step=3`, ~20 minutes wall-clock at 12 arms × 8 shards.
+so sharding across containers is exact — wall-clock collapses to ~20 min at 12
+arms × 8 shards, but the GPU-hours do not shrink. My earlier "~27 GPU-hours" was
+optimistic: the GWT agent measured **~55 s/prompt at dim_batch=32 on an A100**
+(~4× Anthropic's ~11.6 s at dim_batch=128 on a B200), so **one 7B arm ≈ 10
+GPU-hours on A100**, ~120 for twelve. `dim_batch` is memory-only for total FLOPs
+but NOT throughput-neutral — per-pass launch overhead dominates at small batch,
+so use **H100/B200 + dim_batch ≥ 64** to reach published-class throughput. The
+first A100 anchor attempt finished 0/8 shards inside a 68-min timeout at
+dim_batch=32.
 
 **What OLMo-3 does NOT let us do:** it is `Olmo3ForCausalLM` with **YaRN** RoPE
 (plus an `attention_factor` term), not Llama with llama3 RoPE. HF Flax has no
