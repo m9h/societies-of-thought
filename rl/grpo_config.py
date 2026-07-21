@@ -93,3 +93,31 @@ def check_grpo_config(*, batch_size: int, grad_accum: int, num_generations: int)
             f"{MIN_PROMPTS_PER_STEP}."
         )
     return n
+
+
+# --- learning-rate schedule ----------------------------------------------------
+# The first Claim A run drifted +0.014 reward over 150 steps. Cause was the
+# schedule, not the model: peak LR 1e-6 (~10x too low for GRPO on a 3B) plus
+# TRL's default linear-decay-to-zero, which put LR at 6.7e-9 by the end. The
+# defaults here are the fix, and resolve_schedule makes the choice explicit so a
+# decay-to-zero can only happen on purpose.
+
+DEFAULT_PEAK_LR = 2e-6
+DEFAULT_SCHEDULE = "constant_with_warmup"
+DEFAULT_WARMUP_RATIO = 0.05
+
+
+def resolve_schedule(lr: float = DEFAULT_PEAK_LR,
+                     schedule: str = DEFAULT_SCHEDULE,
+                     warmup_ratio: float = DEFAULT_WARMUP_RATIO):
+    """Return (learning_rate, lr_scheduler_type, warmup_ratio) for GRPOConfig.
+
+    Defaults hold the LR up rather than annealing it to zero over a short run --
+    the failure that produced a flat reward curve. Pass schedule="linear" or
+    "cosine" to decay ON PURPOSE.
+    """
+    if not (1e-8 < lr < 1e-2):
+        raise ValueError(
+            f"learning rate {lr} is outside a sane range (1e-8, 1e-2). GRPO on a "
+            "3B model wants ~2e-6 to 5e-6.")
+    return lr, schedule, warmup_ratio

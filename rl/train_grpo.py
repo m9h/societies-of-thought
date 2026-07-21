@@ -42,7 +42,7 @@ from peft import LoraConfig  # noqa: E402
 from trl import GRPOConfig, GRPOTrainer, SFTConfig, SFTTrainer  # noqa: E402
 
 from rl.reward import countdown_reward, format_reward, grade_completion  # noqa: E402
-from rl.grpo_config import check_grpo_config
+from rl.grpo_config import check_grpo_config, resolve_schedule
 from sot.grade import grade  # noqa: E402
 
 PROMPT = (
@@ -166,6 +166,13 @@ def main() -> None:
                          "is computed within a prompt's group, so that is a comparison "
                          "among 8 attempts at a single puzzle and it does not learn.")
     ap.add_argument("--grad-accum", type=int, default=24)
+    ap.add_argument("--lr", type=float, default=2e-6,
+                    help="peak learning rate. The first run used 1e-6 and barely "
+                         "moved the policy (KL topped out at 0.0014). ~2-5e-6 for a 3B.")
+    ap.add_argument("--lr-schedule", default="constant_with_warmup",
+                    help="TRL default is linear decay to ZERO, which annealed the "
+                         "first run to 6.7e-9 by step 150. Hold it up by default.")
+    ap.add_argument("--warmup-ratio", type=float, default=0.05)
     ap.add_argument("--no-vllm", action="store_true",
                     help="use HF generate for rollouts instead of vLLM. GRPO generates "
                          "num_generations completions per prompt per step (384/step here); "
@@ -220,9 +227,18 @@ def main() -> None:
     train_ds = countdown_split(args.train_n, seed=args.seed)
     eval_ds = countdown_split(args.eval_n, seed=12345, skip=50_000)  # disjoint held-out
 
+    # The first run's reward was flat because LR peaked at 1e-6 and TRL's default
+    # scheduler decayed it to ~0 over 150 steps. resolve_schedule holds it up
+    # unless a decaying schedule is asked for explicitly. See rl/grpo_config.py.
+    lr, lr_sched, warmup = resolve_schedule(
+        lr=args.lr, schedule=args.lr_schedule, warmup_ratio=args.warmup_ratio)
+    print(f"  schedule: peak_lr={lr:.1e} type={lr_sched} warmup={warmup}")
+
     cfg = GRPOConfig(
         output_dir=str(run_dir),
-        learning_rate=1e-6,
+        learning_rate=lr,
+        lr_scheduler_type=lr_sched,
+        warmup_ratio=warmup,
         per_device_train_batch_size=args.batch_size,     # completions
         gradient_accumulation_steps=args.grad_accum,
         num_generations=args.num_generations,
