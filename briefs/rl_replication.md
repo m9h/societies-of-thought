@@ -402,3 +402,62 @@ own "1 day for 3 arms x 3 seeds" estimate assumed a datacentre GPU.
 
 The Spark still earned its keep: every harness bug was found there at zero GPU
 cost before a single paid hour was spent.
+
+---
+
+## Claim B: NO-GO on the full A/B — the setup format-hacks instead of learning (2026-07-20)
+
+Before spending ~$88 on 3 arms x 3 seeds, one baseline probe (60 steps, A100,
+~$5) was run to answer a prerequisite: does ANY arm actually learn under our
+forced GRPO+LoRA setup? If baseline does not learn, comparing dialogue-vs-
+monologue *learning rates* is comparing three flat lines, and the dialogue arm's
+higher reward is just the SFT head-start -- not the effect the paper claims.
+
+It does not learn. The probe trajectory (eval-n=16, so accuracy is k/16):
+
+    step   accuracy      parse     tokens
+      0    18.8% (3/16)  81.2%     204
+     15     6.2% (1/16)  100.0%    143
+     30    12.5% (2/16)  81.2%     174
+     45     6.2% (1/16)  100.0%    127
+
+Read together, these three columns are the format-hacking signature:
+
+  - accuracy does NOT rise. It is highest at step 0 and bounces at 1-2 of 16.
+    The paper reports 28-38% by step 40; we are at 6-12% and not climbing.
+  - completion length collapses (204 -> 127) while parse rate reaches 100%.
+  - reward rises MONOTONICALLY across quartiles (0.057 -> 0.061 -> 0.064 ->
+    0.068). But reward = 0.9*accuracy + 0.1*format, and at ~0.07 with format
+    compliance high, the rise is the model earning the 0.1 FORMAT term by
+    producing shorter, cleanly-formatted output -- not by solving arithmetic.
+
+So the reward curve that looked like learning is the model optimising the one
+thing it can reach: format. Accuracy, the thing under test, is flat near
+baseline.
+
+WHY THIS IS A FINDING, NOT A FAILURE. The paper's Claim B used PPO with (almost
+certainly) full fine-tuning. We cannot: TRL 1.8 removed PPOTrainer, and full FT
+of a 3B model OOMs an 80GB A100 (policy + reference + fp32 AdamW ~42GB before a
+rollout), forcing LoRA. Under GRPO+LoRA the Countdown learning signal does not
+reproduce in 60 steps. That is a real statement about the robustness of the
+paper's central experiment -- it may depend on the PPO+full-FT regime -- and it
+mirrors the mechanistic half, where the steering effect turned out to be a
+Countdown artifact.
+
+The prior schedule fix (peak LR 1e-6 decaying to 6.7e-9 -> 2e-6
+constant_with_warmup) was necessary and did lift reward off the flat line, so
+the no-go is NOT "we mis-set the LR". Reward moved; accuracy did not.
+
+DECISION: do not run the 3x3 A/B as configured. The comparison it would produce
+(dialogue vs monologue format-hacking rate) does not answer Claim B.
+
+A HONEST LIMITATION OF THE PROBE ITSELF: eval-n was set to 16 to keep the probe
+cheap, which makes each accuracy point 1-3 correct out of 16 -- too noisy to read
+alone. The verdict rests on the length-collapse + monotonic-format-reward
+signature, which is unambiguous, not on the accuracy points in isolation. A
+cleaner probe would have used eval-n>=64; it would not have changed the call.
+
+WHAT WOULD CHANGE THE ANSWER (not pursued without a decision): full fine-tuning
+on a larger GPU (H100/2xA100), reward shaping that penalises length-hacking, or
+the paper's full 250-step horizon. The step-45 format collapse argues more steps
+make this worse, not better.
