@@ -83,6 +83,49 @@ OLMo implementation at any version, and penzai has no `olmo3` variant. So this i
 a **PyTorch `jlens` study** — `jlens-jax` and the penzai backend are off its
 critical path, and the llama3 RoPE work does not transfer.
 
+### Second-family replication: Ministral-3
+
+An effect on twelve arms of ONE base is one family. If the base→reasoning
+J-space shift is a fact about training rather than about OLMo, it should appear
+in an unrelated model too. Mistral now ships a base→post-trained ladder that lets
+us check:
+
+```
+mistralai/Ministral-3-8B-Base-2512       Apache-2.0, ungated, 34 layers, d=4096
+              -Instruct-2512
+              -Reasoning-2512
+```
+
+Comparable size to OLMo-3-7B (32/4096) and — unlike OLMo — **plain RoPE, no
+YaRN**, so nothing in the RoPE work bites it either way.
+
+It is a REPLICATION of the ladder's main effect, NOT a second copy of the study.
+Two things it cannot do, both of which must travel with any Ministral result:
+
+- **No domain control.** Mistral publishes base + instruct + reasoning and
+  nothing like the RL-Zero-by-domain arms. So Ministral tests whether the
+  base→reasoning geometry shift *reproduces*; it cannot separate viewpoint from
+  capability the way the OLMo RL-Zero control does. The capability confound is
+  un-controlled here by construction.
+
+- **No anchor lens.** Neuronpedia publishes no lens for any Mistral/Ministral/
+  Magistral, so the `validate_fit` gate (cosine ≥ 0.95 vs a published reference)
+  that protects the OLMo base fit CANNOT run for Ministral. Its fit is therefore
+  *unanchored*. Validation has to come from two weaker sources: (a) the pipeline
+  is proven correct on OLMo, where the anchor exists, and the SAME code fits
+  Ministral; (b) a seed-split self-consistency check (two disjoint prompt halves
+  must agree). Report a Ministral lens as unanchored and say so.
+
+- **Multimodal wrapper.** Ministral-3-8B is `Mistral3ForConditionalGeneration`
+  with a `vision_config`; the text backbone is nested. The fit must load the
+  `.language_model` submodule, not `AutoModelForCausalLM`. Verified from the
+  config (text_config: 34 layers, d=4096, vocab 131072); the extraction itself is
+  untested and is the one integration risk.
+
+Net: Ministral is a cheap, genuinely independent check on the ONE thing the OLMo
+ladder would headline — does the shift reproduce across families — bought at the
+cost of no control and no anchor. Worth running alongside, not instead.
+
 ---
 
 ## Claims 7 and 8 — resolved against the source
