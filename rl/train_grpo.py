@@ -181,6 +181,12 @@ def main() -> None:
                     help="TRL default is linear decay to ZERO, which annealed the "
                          "first run to 6.7e-9 by step 150. Hold it up by default.")
     ap.add_argument("--warmup-ratio", type=float, default=0.05)
+    ap.add_argument("--temperature", type=float, default=0.8,
+                    help="rollout sampling temperature. TRL's default (1.0) produced "
+                         "only ~8%% valid-attempt rollouts vs ~24%% greedy, starving GRPO "
+                         "of correct answers to reinforce. Lower sharpens rollouts toward "
+                         "the model's competent behaviour -> more positives per group.")
+    ap.add_argument("--top-p", type=float, default=0.95)
     ap.add_argument("--no-vllm", action="store_true",
                     help="use HF generate for rollouts instead of vLLM. GRPO generates "
                          "num_generations completions per prompt per step (384/step here); "
@@ -255,6 +261,8 @@ def main() -> None:
         per_device_train_batch_size=args.batch_size,     # completions
         gradient_accumulation_steps=args.grad_accum,
         num_generations=args.num_generations,
+        temperature=args.temperature,
+        top_p=args.top_p,
         # 400 tokens truncates Countdown reasoning; TinyZero-style runs use ~1024.
         max_completion_length=1024,
         max_steps=args.steps,
