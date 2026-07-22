@@ -95,15 +95,77 @@ def _normalise_answer_container(completion: str) -> str:
     return completion + f"\n<answer>{inner}</answer>"
 
 
-def countdown_reward(completions, target, nums, strict_format: bool = False, **kwargs):
+def attempt_reward(completion: str, nums: list[int], strict: bool = False) -> float:
+    """1.0 iff the completion is a REAL Countdown attempt: a reasoning block, exactly
+    one answer container, AND an expression that uses each given number exactly once
+    (target-independent — a valid attempt that misses the target still counts).
+
+    This is the anti-hack replacement for the format slot. `format_reward` pays for
+    the <think>/<answer> skeleton regardless of content, so a model can farm the 0.1
+    with `<answer>1</answer>` and never do arithmetic — which is exactly what the RL
+    probe did (reward climbed via format while accuracy stayed flat). Requiring a valid
+    equation using the numbers removes the shortcut: the only way to earn the credit is
+    to produce real Countdown expressions, which is a step toward correctness.
+
+    Reuses the shared grader's extraction (via grade_completion's `pred`) so it handles
+    the same tag/boxed/LaTeX cases the accuracy path does — no second parser to drift.
+    """
+    think = _STRICT_THINK if strict else _THINK
+    if not think.search(completion):
+        return 0.0
+    answers = _ANSWER.findall(completion)
+    if not strict:
+        answers = answers or _GROUP.findall(completion)
+    if len(answers) != 1:
+        return 0.0
+
+    # Grade with the real target; we only read the extracted expression and whether it
+    # parsed as arithmetic. `pred` is the normalised expression the grader found.
+    g = grade_completion(completion, 0, nums)  # target irrelevant to the number check
+    if not g.parsed or not g.pred:
+        return 0.0
+    used = [int(t) for t in re.findall(r"\d+", g.pred)]
+    return 1.0 if sorted(used) == sorted(nums) else 0.0
+
+
+def countdown_reward(completions, target, nums, strict_format: bool = False,
+                     reward_shape: str = "attempt", **kwargs):
     """TRL GRPO reward signature: returns one float per completion.
 
     TRL passes dataset columns through as keyword lists, so `target` and `nums` arrive
     as lists aligned with `completions`.
+
+    reward_shape:
+      "attempt" (default) — 0.9*accuracy + 0.1*attempt. The 0.1 requires a real
+        equation using the numbers, closing the skeleton-farming exploit that made the
+        first RL probe format-hack. This is the shape the sweep should use.
+      "paper" — 0.9*accuracy + 0.1*format, the paper-faithful reward, kept for the A/B
+        that demonstrates the exploit. It pays 0.1 for empty tags.
+
+    Component means for the batch are stashed in LAST_COMPONENTS so the training loop
+    can log accuracy and format SEPARATELY — the diagnostic the first probe lacked.
     """
-    out = []
+    if reward_shape not in ("attempt", "paper"):
+        raise ValueError(f"reward_shape must be 'attempt' or 'paper', got {reward_shape!r}")
+
+    out, accs, fmts = [], [], []
     for completion, t, n in zip(completions, target, nums):
         text = completion if isinstance(completion, str) else completion[0]["content"]
-        r = 0.9 * accuracy_reward(text, t, list(n)) + 0.1 * format_reward(text, strict_format)
-        out.append(r)
+        n = list(n)
+        acc = accuracy_reward(text, t, n)
+        fmt = (attempt_reward(text, n, strict_format) if reward_shape == "attempt"
+               else format_reward(text, strict_format))
+        accs.append(acc)
+        fmts.append(fmt)
+        out.append(0.9 * acc + 0.1 * fmt)
+
+    if accs:
+        LAST_COMPONENTS["accuracy"] = sum(accs) / len(accs)
+        LAST_COMPONENTS["format"] = sum(fmts) / len(fmts)
+        LAST_COMPONENTS["shape"] = reward_shape
     return out
+
+
+# Batch component means from the most recent countdown_reward call. The training loop
+# logs these so "reward went up" can be read as accuracy-vs-format rather than guessed.
+LAST_COMPONENTS: dict = {"accuracy": float("nan"), "format": float("nan"), "shape": ""}

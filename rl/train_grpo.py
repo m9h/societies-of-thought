@@ -41,7 +41,8 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, TrainerCallback  #
 from peft import LoraConfig  # noqa: E402
 from trl import GRPOConfig, GRPOTrainer, SFTConfig, SFTTrainer  # noqa: E402
 
-from rl.reward import countdown_reward, format_reward, grade_completion  # noqa: E402
+from rl.reward import (  # noqa: E402
+    LAST_COMPONENTS, countdown_reward, format_reward, grade_completion)
 from rl.grpo_config import check_grpo_config, resolve_schedule
 from sot.grade import grade  # noqa: E402
 
@@ -137,10 +138,17 @@ class EvalAndLog:
             "val_accuracy": correct / n,
             "parse_rate": parsed / n,
             "mean_completion_tokens": toks / n,
+            # Training-batch reward components, so "reward went up" reads as
+            # accuracy-vs-format rather than being inferred. The first probe
+            # format-hacked and we only diagnosed it afterwards from the reward math;
+            # this makes it visible at every eval. See rl/reward.py LAST_COMPONENTS.
+            "train_acc_reward": LAST_COMPONENTS.get("accuracy", float("nan")),
+            "train_fmt_reward": LAST_COMPONENTS.get("format", float("nan")),
         }
         self.history.append(rec)
         print(f"    step {step:4d}  acc={rec['val_accuracy']:.1%}  "
-              f"parse={rec['parse_rate']:.1%}  tok={rec['mean_completion_tokens']:.0f}")
+              f"parse={rec['parse_rate']:.1%}  tok={rec['mean_completion_tokens']:.0f}  "
+              f"[train acc-r={rec['train_acc_reward']:.3f} fmt-r={rec['train_fmt_reward']:.3f}]")
         try:
             import trackio
             trackio.log(rec)
@@ -185,6 +193,11 @@ def main() -> None:
                     help="full FT instead of LoRA. OOMs a 80GB A100 on a 3B model: "
                          "policy + frozen reference + fp32 AdamW states is ~42GB before "
                          "a single rollout.")
+    ap.add_argument("--reward-shape", default="attempt", choices=["attempt", "paper"],
+                    help="attempt (default, anti-hack): the 0.1 format term requires a "
+                         "valid equation using the numbers, closing the skeleton-farming "
+                         "exploit that made the first probe format-hack. paper: the "
+                         "exploitable 0.9*acc+0.1*format, for the A/B.")
     ap.add_argument("--strict-format", action="store_true",
                     help="score format strictly; shows whether the result is an artifact "
                          "of NOT penalising dialogue scaffolding")
@@ -266,7 +279,9 @@ def main() -> None:
     )
 
     def reward_fn(completions, target, nums, **kw):
-        return countdown_reward(completions, target, nums, strict_format=args.strict_format)
+        return countdown_reward(completions, target, nums,
+                                strict_format=args.strict_format,
+                                reward_shape=args.reward_shape)
 
     # LoRA rather than full fine-tuning. Full FT of a 3B model needs policy (6GB) +
     # frozen reference (6GB) + fp32 AdamW states (~24GB) + grads before any rollout is

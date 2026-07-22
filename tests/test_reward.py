@@ -40,16 +40,26 @@ def test_accuracy_is_the_arithmetic_not_the_models_claim():
 
 
 def test_reward_is_the_papers_formula():
-    r = countdown_reward([MONOLOGUE], target=[32], nums=[[25, 30, 3, 4]])[0]
+    # reward_shape="paper" is the paper-faithful 0.9*acc + 0.1*format. The DEFAULT is
+    # now "attempt" (anti-hack) -- see test_reward_antihack.py -- so this test names the
+    # shape it means.
+    r = countdown_reward([MONOLOGUE], target=[32], nums=[[25, 30, 3, 4]],
+                         reward_shape="paper")[0]
     assert r == pytest.approx(0.9 * 1.0 + 0.1 * 1.0)
 
     # correct answer, no reasoning block -> loses only the format term
     bare = "<answer>(30 - 25 + 3) * 4</answer>"
-    assert countdown_reward([bare], target=[32], nums=[[25, 30, 3, 4]])[0] == pytest.approx(0.9)
+    assert countdown_reward([bare], target=[32], nums=[[25, 30, 3, 4]],
+                            reward_shape="paper")[0] == pytest.approx(0.9)
 
-    # well-formatted but wrong -> keeps only the format term
+    # well-formatted but wrong -> under the PAPER formula keeps the 0.1 format term...
     wrong = "<think> guessing </think><answer>(30 - 25) * 4</answer>"
-    assert countdown_reward([wrong], target=[32], nums=[[25, 30, 3, 4]])[0] == pytest.approx(0.1)
+    assert countdown_reward([wrong], target=[32], nums=[[25, 30, 3, 4]],
+                            reward_shape="paper")[0] == pytest.approx(0.1)
+    # ...but under the anti-hack default it pays NOTHING, because (30-25)*4 uses only
+    # three of the four numbers -- not a valid Countdown attempt. This is the exploit
+    # the default closes.
+    assert countdown_reward([wrong], target=[32], nums=[[25, 30, 3, 4]])[0] == pytest.approx(0.0)
 
 
 def test_nothing_rewards_conversation_itself():
