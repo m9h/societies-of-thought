@@ -297,6 +297,55 @@ intended.
 
 ---
 
+## 11. Cross-project synthesis: the OLMo-3 J-space ladder completes this story
+
+On 2026-07-21 the sibling J-space effort (`jacobian-lens/results/posttrain/`) ran the
+first *external* test of Anthropic's Claim 6 — "post-training shaped the J-space toward a
+point of view rather than pure prediction" — on the fully open OLMo-3 ladder. It found the
+claim **supported and sharpened**: post-training moves the J-space massively (Instruct lens
+cos 0.69 from base, ~31%, vs 0.97 same-model refit), **decoupled from capability** (MMLU
+flat-to-down while geometry moves 31%), **method-driven** (SFT/DPO ~5× RLVR), and nearly
+**domain-invariant** (RL-Zero domains within ~1%).
+
+That result is on a different model (OLMo-3-7B, not DeepSeek-R1-Distill) and a different
+object (whole-lens geometry, not one SAE feature), so what follows is structural
+corroboration, **not** a measurement on these weights. With that caveat, it closes three
+gaps in the account above.
+
+**(a) Two unrelated methods now agree that the viewpoint layer is decoupled from
+capability.** This document's headline — steering the conversational feature doubles
+Countdown but costs −22 on MATH-Hard — is an SAE-activation-steering result. Claim 6 is a
+Jacobian-lens-geometry result. They share no machinery, and they reach the same structural
+conclusion: the representational/viewpoint layer post-training installs is separate from
+the competence layer. Single-method → two-method.
+
+**(b) It explains the paradox in §8.** We pre-registered that the conversational feature
+would be *orthogonal* to the J-space workspace and found the opposite — it is *more*
+workspace-resident than average (0.803 vs 0.728). Claim 6 resolves why: post-training
+installs a **real** viewpoint, the feature is part of it, but the whole viewpoint is
+decoupled from capability. So the feature is genuine workspace machinery (§8) that
+nonetheless cannot drive reasoning (§3–5), because viewpoint ≠ capability. Over-driving a
+real viewpoint direction can only corrupt the computation it is part of (§7 saturation),
+never improve it. **SoT was right the feature is real; wrong that it is a capability
+lever.**
+
+**(c) It softly undercuts the RL-emergence framing.** SoT reads the "society of thought" as
+*emerging under RL*. Claim 6 finds RLVR reshapes the J-space ~5× *less* than SFT/DPO. And
+DeepSeek-R1-Distill — the model here — acquired its reasoning by **SFT-distilling** R1's
+traces, not by RL directly. So the reasoning-viewpoint is SFT-installed, consistent with
+Claim 6's method ordering and in tension with an RL-emergence reading. A tension, not a
+refutation.
+
+**The combined claim.** Post-training installs a real viewpoint (Claim 6 — the one claim in
+this program we *support*). That viewpoint is decoupled from capability (Claim 6 + this
+document, two methods). The society-of-thought paper's error was reading a real viewpoint
+direction as a lever on reasoning. Calling Claim 6's viewpoint "the society of thought"
+would be overreach — the two rhyme, they are not the same object — but they are two views
+of one structure: post-training reorganizes *how a model represents*, largely independently
+of *how well it reasons*.
+
+---
+
 ## Reproducing
 
 ```bash
