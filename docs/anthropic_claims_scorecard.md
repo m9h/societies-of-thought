@@ -25,14 +25,37 @@ the way the paper states them.
 | 3 | That emergence is *architectural* (hybrid/Mamba-like models show it) | **REFUTED** | It is gradual and **scale**-driven. The one positive model was simultaneously biggest, only hybrid, most capable. `HANDOFF.md` finding 3, self-corrected |
 | 4 | Tripartite CKA structure in J-space is a global-workspace signature | **PARTLY REFUTED** | Mostly smooth drift; real excess only ≥20B. Raw blockiness 0.08→0.29 looked real but a distance-only null reproduced 79–91% of it |
 | 5 | `pass@k` is a valid metric for feature emergence | **REFUTED** | The metric rewards noise. `HANDOFF.md` finding 2 |
-| 6 | Post-training shaped the J-space to reflect a *point of view* rather than pure prediction | **UNTESTED — and until 2026-11 untestable** | Needs base + post-trained checkpoints of one model. AI2's OLMo-3 published twelve. **This is the open one.** |
+| 6 | Post-training shaped the J-space to reflect a *point of view* rather than pure prediction | **SUPPORTED — and sharpened** (first external test) | OLMo-3 ladder, 2026-07-21: Instruct lens cos **0.69** from base (~31% move) vs 0.97 same-model refit; **decoupled from capability** (MMLU flat-to-down while J-space moves 31%); **method-driven** (SFT/DPO ~5× RLVR), **nearly domain-invariant** (RL-Zero domains within ~1%). Anchor-gated (identity_distance 0.2199 vs published 0.2209, 0.41%). `jacobian-lens/results/posttrain/claim6_ladder_result.md` |
 | 7 | The workspace is **capacity-limited** | **UNTESTED — but the paper gives numbers** | ✅ Verified in the source: *"never more than 10%"* of total activation variance; *"holds on the order of tens of concepts at a time"*. Checkable on published lens files + a forward pass. No longer ⚠️ |
 | 8 | The workspace *broadcasts back* to the rest of the network | **NOT CLAIMED — the paper concedes it** | ✅ Verified: *"there are no obviously separable input processors, and the broadcast we document occurs within a single feedforward pass rather than through recurrent loops."* Nothing to refute; do not spend on it |
 | 9 | Conversational/SAE features align with the J-space workspace | **REFUTED (our own prediction)** | We pre-registered that they would. They don't. `FINDINGS.md` §8 |
 
 ---
 
-## Claim 6 — the one that just became testable
+## Claim 6 — TESTED, and supported (2026-07-21)
+
+**Result:** `jacobian-lens/results/posttrain/claim6_ladder_result.md`. The first
+external test of this claim, on fully open artifacts — Anthropic's own version
+rests on Sonnet 4.5, whose activations no outside party can access (their invited
+commentators Dehaene & Naccache noted they could not run the test themselves).
+
+Post-training moves the J-space **massively and decoupled from capability**: the
+Instruct lens is only cos 0.69 from base (~31%), against a same-model refit that
+agrees at 0.97 — while MMLU is flat-to-slightly-*down*. A large representational
+shift with no competence gain is exactly "a point of view rather than pure
+prediction." The move's magnitude is set by **method, not domain**: SFT/DPO
+reshapes ~5× more than RLVR-from-base, and varying the RLVR domain
+(math/code/IF/general) at matched capability changes it ~1%. Anchor-gated
+(identity_distance 0.2199 vs published 0.2209) — on the *fixed* gate; the bug in
+the section above would have false-failed this. RL-Zero-Mix was excluded when the
+capability probe caught it was `olmo2-retrofit`, a different architecture.
+
+So Claim 6 is **supported and sharpened**: the viewpoint post-training installs
+is method/format-driven and nearly domain-invariant. It is also the one major
+claim on this board we *support* rather than refute — and the one nobody outside
+Anthropic had been able to check.
+
+The design, kept for the record:
 
 The paper asserts post-training shaped J-space toward a viewpoint rather than
 pure next-token prediction. Nobody outside the lab could check it: you need the
