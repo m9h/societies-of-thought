@@ -199,11 +199,11 @@ def main() -> None:
                     help="full FT instead of LoRA. OOMs a 80GB A100 on a 3B model: "
                          "policy + frozen reference + fp32 AdamW states is ~42GB before "
                          "a single rollout.")
-    ap.add_argument("--reward-shape", default="attempt", choices=["attempt", "paper"],
-                    help="attempt (default, anti-hack): the 0.1 format term requires a "
-                         "valid equation using the numbers, closing the skeleton-farming "
-                         "exploit that made the first probe format-hack. paper: the "
-                         "exploitable 0.9*acc+0.1*format, for the A/B.")
+    ap.add_argument("--reward-shape", default="attempt", choices=["attempt", "paper", "shaped"],
+                    help="attempt: 0.1 requires a valid equation (closes the empty-skeleton "
+                         "farm). shaped (recommended): 1.0 correct / 0.1*proximity-to-"
+                         "target / 0 -- dense and UNFARMABLE, breaks the valid-but-wrong "
+                         "farm. paper: the exploitable 0.9*acc+0.1*format, for the A/B.")
     ap.add_argument("--strict-format", action="store_true",
                     help="score format strictly; shows whether the result is an artifact "
                          "of NOT penalising dialogue scaffolding")

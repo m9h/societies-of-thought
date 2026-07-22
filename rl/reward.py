@@ -128,6 +128,53 @@ def attempt_reward(completion: str, nums: list[int], strict: bool = False) -> fl
     return 1.0 if sorted(used) == sorted(nums) else 0.0
 
 
+def _equation_value(pred: str | None, nums: list[int]) -> float | None:
+    """Numeric value of a valid Countdown equation using each number once, else None.
+
+    Reuses the same charset-restricted eval the grader uses. Returns None unless the
+    expression is a valid arithmetic expression using exactly the given numbers, so a
+    subset/superset or garbage answer yields no proximity credit.
+    """
+    if not pred:
+        return None
+    expr = pred
+    if "=" in expr:
+        parts = [p.strip() for p in expr.split("=") if p.strip()]
+        non_trivial = [p for p in parts if not re.fullmatch(r"-?\d+(?:\.\d+)?", p)]
+        expr = (non_trivial or parts)[0]
+    if not re.fullmatch(r"[0-9+\-*/()\s.]+", expr):
+        return None
+    if sorted(int(t) for t in re.findall(r"\d+", expr)) != sorted(nums):
+        return None
+    try:
+        return float(eval(expr, {"__builtins__": {}}, {}))  # noqa: S307 charset-restricted
+    except (SyntaxError, ZeroDivisionError, TypeError, NameError, OverflowError):
+        return None
+
+
+def shaped_reward(completion: str, target: int, nums: list[int]) -> float:
+    """Distance-shaped Countdown reward -- dense and UNFARMABLE.
+
+        1.0                       if correct
+        0.1 * proximity           if a valid equation using all the numbers
+        0.0                       otherwise
+        proximity = max(0, 1 - |value - target| / max(|target|, 1))
+
+    Unlike attempt_reward's flat 0.1, the partial credit scales with how CLOSE the
+    equation's value is to the target, so it cannot be farmed by emitting a fixed
+    valid-but-wrong equation -- raising it requires real arithmetic search. See the
+    exploit cascade in briefs/rl_replication.md.
+    """
+    g = grade_completion(completion, target, nums)
+    if g.correct:
+        return 1.0
+    val = _equation_value(g.pred, nums)
+    if val is None:
+        return 0.0
+    proximity = max(0.0, 1.0 - abs(val - target) / max(abs(target), 1))
+    return 0.1 * proximity
+
+
 def countdown_reward(completions, target, nums, strict_format: bool = False,
                      reward_shape: str = "attempt", **kwargs):
     """TRL GRPO reward signature: returns one float per completion.
@@ -145,14 +192,25 @@ def countdown_reward(completions, target, nums, strict_format: bool = False,
     Component means for the batch are stashed in LAST_COMPONENTS so the training loop
     can log accuracy and format SEPARATELY — the diagnostic the first probe lacked.
     """
-    if reward_shape not in ("attempt", "paper"):
-        raise ValueError(f"reward_shape must be 'attempt' or 'paper', got {reward_shape!r}")
+    if reward_shape not in ("attempt", "paper", "shaped"):
+        raise ValueError(
+            f"reward_shape must be 'attempt', 'paper', or 'shaped', got {reward_shape!r}")
 
     out, accs, fmts = [], [], []
     for completion, t, n in zip(completions, target, nums):
         text = completion if isinstance(completion, str) else completion[0]["content"]
         n = list(n)
         acc = accuracy_reward(text, t, n)
+        if reward_shape == "shaped":
+            # Dense, unfarmable: 1.0 correct / 0.1*proximity / 0. No separate flat
+            # term to farm. Record the proximity partial in `fmt` for the same live
+            # acc-vs-partial diagnostic.
+            r = shaped_reward(text, t, n)
+            fmt = (r / 0.1) if not acc else 0.0   # the proximity fraction, for logging
+            accs.append(acc)
+            fmts.append(fmt)
+            out.append(r)
+            continue
         fmt = (attempt_reward(text, n, strict_format) if reward_shape == "attempt"
                else format_reward(text, strict_format))
         accs.append(acc)
