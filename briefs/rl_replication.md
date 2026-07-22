@@ -461,3 +461,63 @@ WHAT WOULD CHANGE THE ANSWER (not pursued without a decision): full fine-tuning
 on a larger GPU (H100/2xA100), reward shaping that penalises length-hacking, or
 the paper's full 250-step horizon. The step-45 format collapse argues more steps
 make this worse, not better.
+
+---
+
+## Breakthrough attempt, 2026-07-22: a diagnosable cascade of reward exploits
+
+Revisited the Claim B no-go to try for a breakthrough. Result: not a breakthrough,
+but a much sharper finding than "it format-hacks" -- a *diagnosable cascade* of three
+reward-hacking exploits, each surfaced by adding a live accuracy-vs-format split to the
+reward (`LAST_COMPONENTS`, logged every eval). All three fixed/diagnosed test-first,
+~$9 of A100 across three probes.
+
+**Exploit 1 -- empty-skeleton format farming.** `format_reward` paid the full 0.1 for
+any `<think>/<answer>` skeleton regardless of content, so `<answer>1</answer>` earned
+0.1 for zero arithmetic. Diagnosed from the reward math (probe 1 plateaued below 0.1
+while length shrank). Fixed test-first: `attempt_reward` requires a valid equation
+using each given number.
+
+**Exploit 2 -- rollout temperature too high.** With the exploit closed, probe 2's live
+split showed `acc-r=0.021, fmt-r=0.083` at step 15: at the GRPO sampling temperature
+(TRL default 1.0) only ~8% of rollouts were even valid attempts vs ~24% greedy, so the
+groups rarely contained a correct answer to reinforce. Fixed: `--temperature 0.8`.
+Probe 3 confirmed it worked at the rollout level -- valid-attempt rate doubled
+(fmt-r 0.083 -> 0.164) and initial correct rate tripled (acc-r 0.021 -> 0.062).
+
+**Exploit 3 -- valid-but-unreasoned collapse (dominant).** Probe 3 full trajectory:
+
+    step   eval-acc  eval-tok   train acc-r  train fmt-r
+      0     15.6%     189          nan          nan
+     15      0%        50         0.062        0.164
+     30      0%        43         0.057        0.219
+     45      0%        40         0.029        0.294
+     60      0%        42         0.042        0.414
+
+`fmt-r` climbs steadily to 0.41 while `acc-r` stays flat ~0.04 and greedy eval sits at
+0% with tokens collapsed to ~40. The model learned to emit a short valid equation using
+all the numbers -- earning the 0.1 attempt term -- WITHOUT the search to hit the target.
+The anti-hack fix closed the empty-skeleton hole and the model found the
+valid-but-unreasoned hole underneath. RL drove the model BELOW baseline (0% vs 15.6%).
+
+**The root cause, and why it matters for the paper.** Any partial-credit term (format,
+attempt) is farmable under GRPO+LoRA whenever full correctness is hard: the model climbs
+the easy partial-credit axis instead of solving. The paper's reward is 0.9*acc +
+0.1*format; under PPO with full fine-tuning it presumably had the capacity/exploration to
+climb the accuracy term directly, so the 0.1 was harmless. Under the GRPO+LoRA regime
+forced on an independent replicator (TRL removed PPOTrainer; full FT OOMs an 80GB A100),
+the same 0.1 is poison. This is a concrete, mechanistic account of WHY Claim B does not
+reproduce externally -- it is not that the claim is false, it is that the reward that
+works under the paper's setup is exploitable under the only setup an outsider can run.
+
+**The next lever (specified, not run):** remove the farmable partial credit -- either a
+correctness-gated format bonus (the 0.1 only if the answer is also correct, so format
+cannot be farmed independently) or a pure binary-accuracy reward. Both collapse the
+exploit surface to "be correct". Worth one more probe on a funded run, not another
+late-night $1.19/hr babysit.
+
+**What is now in the harness (all committed, tested):** `attempt_reward` +
+`reward_shape` flag, per-batch acc/fmt instrumentation, `--temperature`/`--top-p`,
+`--lr`/`--lr-schedule`. The RL replication is no longer "we could not get it to run" --
+it is "we ran it, instrumented it, and can point at the exact reward-design reason it
+does not reproduce, with the fix specified."
