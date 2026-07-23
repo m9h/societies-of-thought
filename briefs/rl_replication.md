@@ -638,3 +638,40 @@ structure arise) can be checked by analysing these traces with the HSE tooling.
 
 Cost: ~$14 (2x A100, converged in ~6h) -- well under the $75-100 Tier-0 estimate, because
 TinyZero needs only 2 GPUs and it converged fast.
+
+---
+
+## Claim A EMERGENCE (HSE on the Tier-0 traces): it's SEARCH, not a society
+
+Free analysis (`analysis/hse_ppo_emergence.py`) of the 1,858 traces the faithful PPO run
+generated, binned EARLY (first 300, near-baseline) vs LATE (last 300, converged), using the
+paper's own perspective-shift segmentation and Balch's HSE (the §7 instrument).
+
+                 n   markers/word  segments  HSE/log2N
+    EARLY      300      0.0046       1.19       0.303 (n=9 segmentable)
+    LATE       300      0.0037       1.01       -- (n=0 segmentable)
+
+Two findings, and they cut the same way as the steering half:
+
+1. **No society emerges -- systematic SEARCH does.** The traces are numbered enumeration:
+   "1. 57-55-30+2 = -16 (Doesn't equal 14)  2. 57-55+30-2 = 30 (Doesn't equal 14) ...".
+   The paper's dialogic markers barely fire (mean ~1 segment = no perspective shifts), and
+   only 9/300 early / 0/300 late traces clear the 3-segment threshold. There is not enough
+   "society" to run the diversity instrument on -- which is itself the result.
+
+2. **RL moves AWAY from dialogic structure.** Early->late, dialogic marker rate FALLS 20%
+   (0.0046 -> 0.0037/word) while traces get LONGER (median 170 -> 409 chars): more search,
+   fewer conversational markers. Training on verifiable correctness sharpens enumeration, it
+   does not grow a chorus of voices.
+
+This is the RL-side confirmation of FINDINGS §5: RL on verifiable correctness selects for
+**verification and backtracking** -- a search property -- and the "society of thought" is a
+stylistic reading of what is mechanically a systematic searcher. The steering half showed
+the induced society is *redundant*; the RL half shows there is barely a society to begin
+with, and it *shrinks* with training.
+
+CAVEAT, stated plainly: the paper's specific anecdote (by step 120, "two personas referring
+to themselves as 'we'") is not something this aggregate can rule out -- a rare trace could
+exist that the verl log's per-step sampling did not surface. But across 1,858 traces the
+dominant mode is unambiguously search, and it becomes MORE so with training, not less. The
+burden is on the persona claim to show it is more than a cherry-picked rarity.
