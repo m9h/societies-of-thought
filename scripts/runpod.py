@@ -33,6 +33,10 @@ PROFILES = {
     "sweep": {"gpu": "H100 PCIe", "disk": 80},
     # 3B PPO (actor + critic + reference + optimizer states): buy VRAM, not bandwidth.
     "rl": {"gpu": "A100 PCIe", "disk": 120},
+    # Tier-0 faithful replication: verl PPO + full FT of Qwen2.5-3B base on Countdown
+    # via the TinyZero recipe. Needs 2 GPUs (N_GPUS=2, ROLLOUT_TP_SIZE=2), extra disk
+    # for the model + verl + old torch/vllm stack. GPU_COUNT=2 set below.
+    "tinyzero": {"gpu": "A100 PCIe", "disk": 200, "count": 2},
     # One pod per ARM for the Claim B A/B, each running its 3 seeds sequentially.
     # Measured 167s/step at 48 prompts/step on A100 80GB, so 150 steps ~= 7h/run,
     # ~21h per arm. Three arms in parallel rather than nine pods: same GPU-hours,
@@ -70,6 +74,7 @@ _DEFAULT = {"gpu": "A100 PCIe", "disk": 80}
 _profile = PROFILES.get(POD_NAME, _DEFAULT)
 GPU_TYPE = os.environ.get("GPU") or _profile["gpu"]
 DISK_GB = int(os.environ.get("DISK") or _profile["disk"])
+GPU_COUNT = int(os.environ.get("GPU_COUNT") or _profile.get("count", 1))
 
 
 def _key() -> str:
@@ -112,7 +117,7 @@ def up() -> None:
         {
             "input": {
                 "cloudType": "ALL",
-                "gpuCount": 1,
+                "gpuCount": GPU_COUNT,
                 "gpuTypeId": gpu_id,
                 "name": f"sot-{POD_NAME}",
                 "imageName": IMAGE,
