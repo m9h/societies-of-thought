@@ -556,3 +556,42 @@ comparison of three non-learners. The reward-design lesson is itself a finding:
 the paper's 0.9*acc+0.1*format is fine under PPO+full-FT but exploitable under
 the GRPO+LoRA regime an outsider is forced into; a dense unfarmable reward is
 required to reproduce the learning externally.
+
+### CORRECTION to the "BREAKTHROUGH" above (same run, full trajectory)
+
+The breakthrough call was made on the step-30 datapoint and was premature -- the
+kind of over-reading this project exists to catch, committed by me. The full
+probe-4 trajectory:
+
+    step   eval-acc  tok   train-correct  proximity
+      0     15.6%    189      --            --
+     15     12.5%    165     0.036         0.052
+     30     18.8%    147     0.057         0.082      <- the "breakthrough" point
+     45      0.0%     45     0.039         0.070      <- greedy collapse
+     60      3.1%     44     0.099         0.077
+
+What actually happened is more interesting than either "breakthrough" or the
+earlier "no-go", and splits the two readouts:
+
+- TRAIN (sampled, 384 completions/step): correct rate rises the WHOLE run,
+  0.036 -> 0.057 -> 0.099, ending at nearly 3x the early rate. GRPO is finding
+  and reinforcing correct answers. This is real learning signal -- no prior
+  probe had it.
+- GREEDY EVAL (do_sample=False): collapses after step 30 -- tokens 147 -> 44,
+  accuracy 18.8% -> 3.1%. The greedy MODE of the policy degenerated to short
+  outputs even as the sampling distribution improved.
+
+This is NOT reward-farming: proximity stayed flat (~0.07-0.08) and correctness
+kept climbing, so the shaped reward did close the farming exploits. It is a
+train/eval divergence + greedy-mode collapse -- a training-STABILITY failure,
+not a reward-DESIGN one. The likely cause is the constant LR 2e-6 over-updating
+a LoRA policy with no KL leash strong enough to prevent the greedy mode drifting
+into a degenerate short-output basin.
+
+Honest status: the reward-design problem is solved (train correct doubled under a
+non-farmable reward), and the remaining problem is well-defined and separate --
+stabilise the policy so the greedy readout tracks the improving sample
+distribution. Next levers (specified, not run): lower/decaying LR, stronger KL
+(beta up from 0.04), gradient clipping, or eval with sampling to match the train
+distribution. That is a tractable RL-stability sweep, not a wall -- but it is
+NOT done, and the earlier "it learns" was overstated.
