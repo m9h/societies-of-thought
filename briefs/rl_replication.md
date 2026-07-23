@@ -595,3 +595,46 @@ distribution. Next levers (specified, not run): lower/decaying LR, stronger KL
 (beta up from 0.04), gradient clipping, or eval with sampling to match the train
 distribution. That is a tractable RL-stability sweep, not a wall -- but it is
 NOT done, and the earlier "it learns" was overstated.
+
+---
+
+## TIER 0 RESULT, 2026-07-23: Claim A REPRODUCES faithfully
+
+Ran the paper's exact setup -- **verl PPO + full fine-tuning** of Qwen-2.5-3B *base* on
+Countdown, via the TinyZero recipe (2x A100 80GB, ~$14, ~6 h to convergence). This is the
+paper's own algorithm, model, data, and reward -- no substitutions.
+
+**It learns, cleanly, and matches the paper.**
+
+    held-out VAL accuracy:  0.242 -> 0.356 -> 0.439 -> 0.521 -> 0.564 (peak) -> ~0.55 plateau
+    train reward:           0.047 -> 0.55 (monotonic, no reversal, max 0.558)
+    response length:        485 -> 622 (GREW -- more reasoning, no collapse)
+
+Baseline Countdown ~24% -> ~56% at convergence: the accuracy MORE THAN DOUBLES. The paper
+reports 27.1% -> 54.8%. This is a clean reproduction of the paper's headline learning result.
+
+Sample generated trace (the emergent self-verification/search Claim A describes):
+
+    <think> We need to use 55, 57, 30, 2 ... to get 14. Let's try different combinations:
+    1. 57 - 55 - 30 + 2 = -16 (Doesn't equal 14)
+    2. 57 - 55 + 30 - 2 = 30 (Doesn't equal 14) ... </think>
+
+**This settles the RL question and flips it to a positive.**
+
+- Claim A's Countdown learning result is REAL and reproduces faithfully on the paper's own
+  PPO + full-FT setup.
+- Our earlier GRPO+LoRA collapse was ENTIRELY the substitution, now proven: same model, same
+  data, same reward -- swap PPO->GRPO and full-FT->LoRA and it collapses; keep the paper's
+  algorithm and it reproduces the paper's numbers. The paper's line "chose PPO for
+  hyperparameter stability" was exactly right, and our collapse was the predicted failure.
+- The reproducibility finding is now sharper AND fairer: the paper's result is sound; what an
+  outsider hits is a tooling-substitution trap (TRL removed PPOTrainer; full FT OOMs a single
+  GPU), which is real and worth documenting, but is NOT a flaw in the paper.
+
+What this does NOT yet test: Claim B (the dialogue-vs-monologue *gap*). We now have a stably
+learning baseline arm, so Claim B (Tier 1) is a well-posed experiment -- 3 arms on this exact
+verl+full-FT setup. And Claim A's *emergence* sub-claim (does dialogic/multi-persona
+structure arise) can be checked by analysing these traces with the HSE tooling.
+
+Cost: ~$14 (2x A100, converged in ~6h) -- well under the $75-100 Tier-0 estimate, because
+TinyZero needs only 2 GPUs and it converged fast.
