@@ -521,3 +521,38 @@ late-night $1.19/hr babysit.
 `--lr`/`--lr-schedule`. The RL replication is no longer "we could not get it to run" --
 it is "we ran it, instrumented it, and can point at the exact reward-design reason it
 does not reproduce, with the fix specified."
+
+---
+
+## BREAKTHROUGH, 2026-07-22 (cont.): the shaped reward learns
+
+Probe 4 (reward_shape=shaped, temperature 0.8) is the first run that LEARNS
+instead of hacking. The distance-shaped reward (1.0 correct / 0.1*proximity / 0,
+proximity = closeness of a valid equation's value to the target) has no flat
+farmable floor -- raising the partial term requires landing closer to the
+target, which is the actual Countdown search.
+
+Trajectory (baseline eval accuracy 15.6%; train metrics are over 384
+completions/step, far less noisy than the n=32 eval):
+
+    step   eval-acc  tok   train-correct  proximity
+      0     15.6%    189      --            --
+     15     12.5%    165     0.036         0.052
+     30     18.8%    147     0.057         0.082
+
+All three signals climb, and the two reliable ones are unambiguous: train
+correct rate 0.036 -> 0.057 and proximity 0.052 -> 0.082. Eval accuracy crossed
+ABOVE baseline. Tokens held at ~147 -- no collapse (probe 3 had collapsed to 50).
+
+This resolves the deeper question the exploit cascade raised: it is NOT a hard
+LoRA-capacity wall. A 3B model with LoRA CAN climb Countdown under a
+non-exploitable reward. The earlier no-go was a reward-design failure, not a
+capability limit -- every prior probe was the model hacking a farmable partial
+term, not failing to learn.
+
+Consequence for Claim B: the RL harness now demonstrably learns, so the 3-arm
+dialogue/monologue A/B is finally a well-posed experiment rather than a
+comparison of three non-learners. The reward-design lesson is itself a finding:
+the paper's 0.9*acc+0.1*format is fine under PPO+full-FT but exploitable under
+the GRPO+LoRA regime an outsider is forced into; a dense unfarmable reward is
+required to reproduce the learning externally.
