@@ -81,3 +81,25 @@ happened." Do not commit to Tier 1/2 until Tier 0's result and measured throughp
 
 Against the current RunPod balance ($165.76), Tier 0 is comfortable; Tier 2 is not, and
 would need a top-up or a funded run -- which is exactly what the Longview grant would cover.
+
+## C5 / Claim B — LAUNCHED 2026-07-24
+
+Running on one 2x A100 PCIe RunPod pod ($2.38/hr; only one pod available, so arms run
+sequentially via `claimB_chain.sh`, each self-capping at 250 steps ~8h). Design: all
+arms share one prompt ending at "Assistant:" (no pre-opened `<think>`), PPO recovered
+verbatim from Tier-0; only the starting weights differ (base / dialogue-primed /
+monologue-primed). See `rl/claimB_data.py`, `rl/sft_prime.py`, `scripts/claimB_pod.sh`.
+
+**Bugs caught on hardware before they could bias the result (all fixed):**
+1. HF Trainer auto-wrapped SFT in `nn.DataParallel` on 2 visible GPUs -> segfault under
+   grad checkpointing. Fixed: prime single-GPU (`CUDA_VISIBLE_DEVICES=0`).
+2. verl PPO hard-requires `flash_attn` (Tier-0's image had it, this one didn't) -> actor
+   load crash. Fixed: install flash-attn in setup.
+3. Uncapped `total_epochs=15` = 19200 steps; would drain balance and give unmatched-step
+   comparison. Fixed: `total_training_steps=250` for matched-step fairness + unattended safety.
+
+**First signal (dialogue arm, RL step 1):** `critic/score/mean=0.202` -- the
+dialogue-primed model solves ~20% of Countdown before RL, vs the base model's ~0. The
+priming head-start is real and immediate; the question C5 answers is whether it also
+learns *faster* than the length-matched-longer monologue arm, or whether the 1.8x-token
+priming advantage explains it. Curves per arm to be compared at matched steps on finish.
