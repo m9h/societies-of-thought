@@ -75,7 +75,11 @@ PY
 # --- 4. prime (skip for baseline) ----------------------------------------------
 if [ "$ARM" != "baseline" ] && [ ! -f "$CKPT/config.json" ]; then
   echo "$(date -Is) SFT priming $ARM ..."
-  python -m rl.sft_prime --train "$DATA/sft_${ARM}_train.parquet" \
+  # SINGLE GPU. With both GPUs visible and no torchrun, HF Trainer auto-wraps the
+  # model in nn.DataParallel, whose scatter/gather segfaults under gradient
+  # checkpointing (seen: core dump at step 0). 3B full-FT fits one 80GB A100, so
+  # pin to device 0; PPO below still uses both GPUs.
+  CUDA_VISIBLE_DEVICES=0 python -m rl.sft_prime --train "$DATA/sft_${ARM}_train.parquet" \
     --model Qwen/Qwen2.5-3B --out "$CKPT" --epochs 3 --lr 1e-5 \
     2>&1 | tee "/workspace/logs/sft_${ARM}.log"
   [ -f "$CKPT/config.json" ] || { echo "priming produced no checkpoint" >&2; exit 1; }
