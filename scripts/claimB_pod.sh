@@ -33,8 +33,8 @@ mkdir -p "$DATA" "$(dirname "$CKPT")" /workspace/logs
 [ -d "$TZ/.git" ]   || git clone -q https://github.com/Jiayi-Pan/TinyZero.git "$TZ"
 cd "$REPO" && git pull -q || true
 python -c "import verl" 2>/dev/null || (cd "$TZ" && pip install -q -e .)
-python -c "import bitsandbytes, flash_attn" 2>/dev/null \
-  || pip install -q bitsandbytes flash-attn --no-build-isolation
+# sft_prime falls back to sdpa + adamw_torch, so flash-attn/bitsandbytes are optional.
+python -c "import pandas, pyarrow" 2>/dev/null || pip install -q pandas pyarrow
 
 # --- 2. data: SFT parquets + the shared-prompt PPO parquet ----------------------
 if [ ! -f "$DATA/train.parquet" ]; then

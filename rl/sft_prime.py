@@ -66,6 +66,9 @@ def main() -> None:
     ap.add_argument("--max-len", type=int, default=1536)  # dialogue median ~220w; headroom
     ap.add_argument("--batch-size", type=int, default=4)
     ap.add_argument("--grad-accum", type=int, default=8)
+    ap.add_argument("--optim", default="adamw_torch",
+                    help="adamw_torch is dependency-free and fits 3B full-FT on 80GB; "
+                         "adamw_bnb_8bit saves memory if bitsandbytes is installed")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
 
@@ -85,8 +88,13 @@ def main() -> None:
     print(f"{len(examples)} SFT examples from {args.train.name}; "
           f"median len {sorted(len(e['input_ids']) for e in examples)[len(examples)//2]}")
 
-    model = AutoModelForCausalLM.from_pretrained(
-        args.model, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
+    try:
+        model = AutoModelForCausalLM.from_pretrained(
+            args.model, torch_dtype=torch.bfloat16, attn_implementation="flash_attention_2")
+    except (ImportError, ValueError):  # flash-attn not built on this pod -> sdpa is fine
+        print("flash_attention_2 unavailable; falling back to sdpa")
+        model = AutoModelForCausalLM.from_pretrained(
+            args.model, torch_dtype=torch.bfloat16, attn_implementation="sdpa")
     model.config.use_cache = False
     model.gradient_checkpointing_enable()
 
@@ -101,7 +109,7 @@ def main() -> None:
         bf16=True,
         logging_steps=5,
         save_strategy="no",
-        optim="adamw_bnb_8bit",
+        optim=args.optim,
         report_to=[],
         seed=args.seed,
     )
