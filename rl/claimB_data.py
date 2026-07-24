@@ -101,6 +101,31 @@ def ppo_records(rows: list[dict], split: str) -> list[dict]:
     return out
 
 
+def rewrite_ppo_prompt(in_path, out_path) -> int:
+    """Rewrite an existing TinyZero countdown parquet to use OUR shared prompt.
+
+    Faithfulness trick: build the PPO set with TinyZero's own countdown.py (identical
+    problems, splits and sizes to Tier-0/Claim A), then swap only the prompt string.
+    That makes Claim B's PPO differ from Claim A by exactly one thing -- the prompt --
+    and the primed checkpoints. Reads each row's ground_truth to reconstruct the prompt,
+    so numbers/target are guaranteed preserved.
+    """
+    import pandas as pd
+
+    df = pd.read_parquet(in_path)
+    changed = 0
+    for i in range(len(df)):
+        gt = df.at[i, "reward_model"]["ground_truth"]
+        nums, target = list(gt["numbers"]), int(gt["target"])
+        new = [{"role": "user", "content": make_prompt(nums, target)}]
+        assert str(target) in new[0]["content"], "prompt lost the target"
+        df.at[i, "prompt"] = new
+        changed += 1
+    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(out_path, index=False)
+    return changed
+
+
 def length_stats(texts: list[str]) -> dict:
     """Character/word length summary -- for recording the dialogue>monologue length
     confound (more priming tokens), not for gating anything."""
