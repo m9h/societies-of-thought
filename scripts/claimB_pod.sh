@@ -111,6 +111,7 @@ setsid nohup python3 -m verl.trainer.main_ppo \
   trainer.default_hdfs_dir=null trainer.n_gpus_per_node="$N_GPUS" trainer.nnodes=1 \
   trainer.save_freq=100 trainer.test_freq=25 \
   trainer.project_name=TinyZero trainer.experiment_name="countdown-claimB-$ARM" \
-  trainer.total_epochs=15 > "/workspace/logs/ppo_${ARM}.log" 2>&1 < /dev/null &
+  trainer.total_epochs=15 trainer.total_training_steps="${STEPS:-250}" \
+  > "/workspace/logs/ppo_${ARM}.log" 2>&1 < /dev/null &
 
 echo "$(date -Is) launched PPO $ARM (pid $!). tail -f /workspace/logs/ppo_${ARM}.log"
