@@ -33,8 +33,17 @@ mkdir -p "$DATA" "$(dirname "$CKPT")" /workspace/logs
 [ -d "$TZ/.git" ]   || git clone -q https://github.com/Jiayi-Pan/TinyZero.git "$TZ"
 cd "$REPO" && git pull -q || true
 python -c "import verl" 2>/dev/null || (cd "$TZ" && pip install -q -e .)
-# sft_prime falls back to sdpa + adamw_torch, so flash-attn/bitsandbytes are optional.
 python -c "import pandas, pyarrow" 2>/dev/null || pip install -q pandas pyarrow
+# flash-attn is REQUIRED by verl PPO (actor uses use_remove_padding + flash attention);
+# Tier-0's image shipped it, this one does not. sft_prime still falls back to sdpa, but
+# PPO hard-fails without this. Prefer a prebuilt wheel; the -devel image has nvcc to build
+# if none matches. ninja speeds any source build.
+if ! python -c "import flash_attn" 2>/dev/null; then
+  echo "$(date -Is) installing flash-attn (required by verl PPO) ..."
+  pip install -q ninja
+  pip install -q flash-attn --no-build-isolation \
+    || { echo "flash-attn install FAILED -- verl PPO cannot run" >&2; exit 1; }
+fi
 
 # --- 2. data: SFT parquets + the shared-prompt PPO parquet ----------------------
 if [ ! -f "$DATA/train.parquet" ]; then
