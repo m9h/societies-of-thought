@@ -13,3 +13,6 @@ results/*.jsonl
 results/**/*.npz
 results/runpod_*.json
 results/ml-intern-postmortem/
+
+# Derived Claim B parquets (regenerate: python -m rl.claimB_data)
+rl/data/claimB/
