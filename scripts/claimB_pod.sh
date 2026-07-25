@@ -19,14 +19,20 @@ set -uo pipefail
 ARM="${1:?arm: baseline | dialogue | monologue}"
 case "$ARM" in baseline|dialogue|monologue) ;; *) echo "bad arm: $ARM" >&2; exit 2;; esac
 
+# MODEL is the base to prime+RL; MODEL_TAG namespaces checkpoints/logs so a second
+# model (e.g. Llama) does not overwrite the first (Qwen). The SFT/PPO data is
+# model-agnostic Countdown text, so it is shared across models -- no rebuild.
+MODEL="${MODEL:-Qwen/Qwen2.5-3B}"
+MODEL_TAG="${MODEL_TAG:-qwen}"
 REPO="${REPO:-/workspace/societies-of-thought}"
 TZ="${TZ:-/workspace/TinyZero}"
 DATA="${DATA:-/workspace/data/claimB}"
-CKPT="${CKPT:-/workspace/ckpt/$ARM}"
+CKPT="${CKPT:-/workspace/ckpt/$MODEL_TAG/$ARM}"
+LOGD="${LOGD:-/workspace/logs/$MODEL_TAG}"
 export HF_HOME="${HF_HOME:-/workspace/hf-cache}"
 export N_GPUS=2 ROLLOUT_TP_SIZE=2 VLLM_ATTENTION_BACKEND=XFORMERS
 export WANDB_MODE=offline PYTHONUNBUFFERED=1 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
-mkdir -p "$DATA" "$(dirname "$CKPT")" /workspace/logs
+mkdir -p "$DATA" "$(dirname "$CKPT")" "$LOGD" /workspace/logs
 
 # --- 1. code + deps ------------------------------------------------------------
 [ -d "$REPO/.git" ] || git clone -q https://github.com/m9h/societies-of-thought.git "$REPO"
@@ -89,13 +95,13 @@ if [ "$ARM" != "baseline" ] && [ ! -f "$CKPT/config.json" ]; then
   # checkpointing (seen: core dump at step 0). 3B full-FT fits one 80GB A100, so
   # pin to device 0; PPO below still uses both GPUs.
   CUDA_VISIBLE_DEVICES=0 python -m rl.sft_prime --train "$DATA/sft_${ARM}_train.parquet" \
-    --model Qwen/Qwen2.5-3B --out "$CKPT" --epochs 3 --lr 1e-5 \
-    2>&1 | tee "/workspace/logs/sft_${ARM}.log"
+    --model "$MODEL" --out "$CKPT" --epochs 3 --lr 1e-5 \
+    2>&1 | tee "$LOGD/sft_${ARM}.log"
   [ -f "$CKPT/config.json" ] || { echo "priming produced no checkpoint" >&2; exit 1; }
 fi
 
 # --- 5. the identical PPO, from this arm's starting weights ---------------------
-BASE_MODEL="Qwen/Qwen2.5-3B"; [ "$ARM" != "baseline" ] && BASE_MODEL="$CKPT"
+BASE_MODEL="$MODEL"; [ "$ARM" != "baseline" ] && BASE_MODEL="$CKPT"
 echo "$(date -Is) PPO $ARM from $BASE_MODEL"
 setsid nohup python3 -m verl.trainer.main_ppo \
   data.train_files="$DATA/train.parquet" data.val_files="$DATA/test.parquet" \
@@ -119,8 +125,8 @@ setsid nohup python3 -m verl.trainer.main_ppo \
   trainer.logger=['console'] +trainer.val_before_train=False \
   trainer.default_hdfs_dir=null trainer.n_gpus_per_node="$N_GPUS" trainer.nnodes=1 \
   trainer.save_freq=100 trainer.test_freq=25 \
-  trainer.project_name=TinyZero trainer.experiment_name="countdown-claimB-$ARM" \
+  trainer.project_name=TinyZero trainer.experiment_name="countdown-claimB-$MODEL_TAG-$ARM" \
   trainer.total_epochs=15 trainer.total_training_steps="${STEPS:-250}" \
-  > "/workspace/logs/ppo_${ARM}.log" 2>&1 < /dev/null &
+  > "$LOGD/ppo_${ARM}.log" 2>&1 < /dev/null &
 
-echo "$(date -Is) launched PPO $ARM (pid $!). tail -f /workspace/logs/ppo_${ARM}.log"
+echo "$(date -Is) launched PPO $ARM (pid $!). tail -f $LOGD/ppo_${ARM}.log"
