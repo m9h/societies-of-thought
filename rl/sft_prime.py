@@ -105,7 +105,7 @@ def main() -> None:
         gradient_accumulation_steps=args.grad_accum,
         learning_rate=args.lr,
         lr_scheduler_type="cosine",
-        warmup_ratio=0.03,
+        warmup_ratio=0.10,  # paper Supp. Table 8: "Linear (10% of total steps)"
         bf16=True,
         logging_steps=5,
         save_strategy="no",

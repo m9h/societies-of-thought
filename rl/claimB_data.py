@@ -57,6 +57,43 @@ def make_prompt(numbers, target) -> str:
     return COUNTDOWN_PROMPT.format(numbers=list(numbers), target=int(target))
 
 
+_CAST_BLOCK = re.compile(r"<cast_of_characters>.*?</cast_of_characters>", re.S | re.I)
+_CONV_TAGS = re.compile(r"</?conversation>", re.I)
+_THINK_N = re.compile(r"</?think\d+>", re.I)
+_PERSONA_N = re.compile(r"<persona\d+>.*?</persona\d+>", re.S | re.I)
+_HTML_COMMENT = re.compile(r"<!--.*?-->", re.S)
+
+
+def concatenate_personas(trace: str) -> str:
+    """Collapse a multi-persona dialogue into ONE <think> block.
+
+    The paper applies this to the **Llama-3.2-3B** condition only:
+
+        "For the conversation condition, reasoning content from multiple personas was
+         concatenated into a single block (<think> </think>) to ensure comparable
+         sequence lengths across conditions in Llama-3.2-3B."
+
+    It is the paper's control for the length confound -- dialogue traces otherwise run
+    ~1.8x longer than monologue traces, so any dialogue advantage is confounded with
+    tokens spent. We shipped a Llama run without it; this restores it.
+
+    The cast-of-characters block (persona definitions) is dropped and the per-speaker
+    <thinkN> tags are stripped, leaving the reasoning content only. The answer container
+    is left untouched for `to_response` to normalise.
+    """
+    t = _HTML_COMMENT.sub(" ", trace)
+    t = _CAST_BLOCK.sub(" ", t)
+    t = _PERSONA_N.sub(" ", t)          # stray persona defs outside the cast block
+    t = _CONV_TAGS.sub(" ", t)
+    t = _THINK_N.sub(" ", t)
+
+    # Everything before the answer container is reasoning; wrap it in one <think>.
+    m = re.search(r"<(group_solution|group_consensus|answer)>", t, re.I)
+    reasoning, tail = (t[: m.start()], t[m.start():]) if m else (t, "")
+    reasoning = re.sub(r"\s+", " ", reasoning).strip()
+    return f"<think> {reasoning} </think>\n{tail.strip()}".rstrip()
+
+
 def to_response(trace: str) -> str:
     """Make a raw trace into a gradable SFT target.
 
