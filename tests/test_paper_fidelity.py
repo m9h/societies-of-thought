@@ -108,7 +108,10 @@ def test_generator_uses_the_spec_teacher():
     assert "paper_spec" in src and "TEACHER_MODEL" in src, (
         "generator must take its teacher from paper_spec, not hardcode one"
     )
-    assert "72b" not in src.lower(), "the 72B substitution must not reappear"
+    # Prose may discuss the old 72B substitution; what must not reappear is a 72B
+    # model *identifier* being passed to a loader.
+    ids = re.findall(r"""["']([^"']*(?:72b|72B)[^"']*)["']""", src)
+    assert not ids, f"a 72B model identifier is still referenced: {ids}"
 
 
 # --- the prompts -------------------------------------------------------------
