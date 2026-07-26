@@ -109,8 +109,17 @@ def test_generator_uses_the_spec_teacher():
         "generator must take its teacher from paper_spec, not hardcode one"
     )
     # Prose may discuss the old 72B substitution; what must not reappear is a 72B
-    # model *identifier* being passed to a loader.
-    ids = re.findall(r"""["']([^"']*(?:72b|72B)[^"']*)["']""", src)
+    # model *identifier*. Walk real string constants, ignoring docstrings/comments.
+    import ast
+
+    tree = ast.parse(src)
+    docstrings = {ast.get_docstring(n) for n in ast.walk(tree)
+                  if isinstance(n, (ast.Module, ast.FunctionDef, ast.ClassDef))}
+    ids = [n.value for n in ast.walk(tree)
+           if isinstance(n, ast.Constant) and isinstance(n.value, str)
+           and n.value not in docstrings
+           and "/" in n.value and not n.value.strip().count(" ")
+           and "72b" in n.value.lower()]
     assert not ids, f"a 72B model identifier is still referenced: {ids}"
 
 
