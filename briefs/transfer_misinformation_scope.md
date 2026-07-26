@@ -136,3 +136,28 @@ compute," and ≥3 seeds separate it from n=1 noise. We register in advance the 
 that any transfer tracks verification/search behaviour rather than persona-diversity — the
 same dissociation our steering and RL-trace analyses already found — making the experiment a
 test of our own thesis as much as the paper's.*
+
+---
+
+## ⚠ SCOPE CORRECTION 2026-07-26 — this is a replication target, not novel work
+
+A direct read of the paper (see `docs/paper_fidelity_audit.md`) shows **the paper already
+runs this experiment.** Claim C6, main text:
+
+> We further test whether conversational scaffolding transfers across domains. Models
+> fine-tuned on multi-agent dialogues for the Countdown task are evaluated on a
+> qualitatively different task: political misinformation detection, where models
+> discriminate between true and fabricated headlines from **23,299 fact-checked claims from
+> PolitiFact**. Despite never encountering this domain during fine-tuning, conversation-
+> primed models achieve faster accuracy gains than baseline models (see Supplementary
+> Methods: Cross-domain reasoning transfer and **Extended Data Fig. 9**).
+
+This brief was scoped as a novel extension. It is not. Two consequences:
+
+1. **Use their dataset and framing**, not a separately-designed LIAR/PolitiFact setup —
+   23,299 PolitiFact claims, true vs fabricated headlines.
+2. **The real gap is their comparison, not the task.** They compare conversation-primed
+   **vs baseline**. They do not appear to run a **monologue-primed** arm on transfer — so
+   their transfer result cannot distinguish "conversational structure transfers" from "any
+   priming transfers." Our three-arm design (plus the length-matched monologue) closes
+   exactly that hole. That is the contribution here; the task itself is theirs.

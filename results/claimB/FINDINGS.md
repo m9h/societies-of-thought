@@ -9,8 +9,17 @@ The SoT paper's central causal experiment: prime a base model with SFT on **dial
 traces vs **monologue** traces, then run **identical** RL and compare. If the dialogic
 society is what drives reasoning gains, dialogue priming should train better.
 
-Our version adds a third arm the paper does not run — **baseline**, no priming at all —
-and enforces two controls the paper's setup does not:
+> ⚠ **Read `docs/paper_fidelity_audit.md` before using anything below.** A direct read of
+> the paper (2026-07-26) established that our priming data is built from **Countdown**
+> while theirs is built from **out-of-domain** reasoning benchmarks. That makes this a
+> related but *different* experiment, and it — not seed — is the main reason our numbers
+> differ from theirs. Two claims in an earlier version of this file were wrong and are
+> struck through below.
+
+~~Our version adds a third arm the paper does not run — baseline, no priming at all~~ —
+**wrong: the paper runs exactly three conditions, "(1) Baseline (RL only, no priming), (2)
+Conversation fine-tuning …, (3) Monologue fine-tuning." Our baseline replicates theirs.**
+We do enforce two controls the paper's setup does not:
 
 1. **One prompt for all arms**, ending at `"Assistant:"`. TinyZero's stock prompt ends
    `"...\n<think>"`, which pre-opens the monologue container and would push a dialogue
@@ -61,12 +70,17 @@ gap sits close to that arm's own oscillation. At n=1 this is suggestive, not est
 
 Two things, pulling in opposite directions — we report both.
 
-**Against the paper's interpretation.** On the paper's *own base model*, the effect it
-reports does not survive to matched-step 250 once the prompt is shared and answers are
-normalised. The dialogue-vs-monologue gap is +0.003. And a *no-priming* baseline gets to
-the same place, which means the comparison the paper actually runs — dialogue vs monologue
-— is not the comparison that matters. The interesting variable is "any priming vs none,"
-and even that washes out on Qwen.
+**Against the paper's *stated* interpretation — but with its own figure.** On the paper's
+own base model the dialogue-vs-monologue gap is +0.003 at step 250. That agrees with the
+paper's Extended Data Fig. 8 caption — *"though both eventually converge"* — and
+contradicts its main text (*"reach higher asymptotic accuracy"*) and its abstract
+(*"substantially accelerates"*). The paper contradicts itself here, and our result picks a
+side. That is the correct framing; an earlier version of this file presented convergence
+as a finding against the paper, which undersells it.
+
+Caveat that cuts hard: with **in-domain** priming (§audit 4.1) both arms are handed the
+task knowledge, so there is little left for format to differentiate. Our convergence may
+be a consequence of our deviation rather than a test of their claim.
 
 **Complicating our own conclusion.** On Llama the dialogue arm is genuinely and durably
 ahead of monologue. We cannot say "dialogue priming does nothing" — we can say it does
@@ -75,33 +89,38 @@ Whether that something is dialogue structure or the 1.8× length confound is exa
 the length-matched-monologue arm (designed in `briefs/transfer_misinformation_scope.md`,
 not yet run) is for.
 
-### The reframing of the paper's numbers
+### The reframing of the paper's numbers — now verified against the source
 
-⚠ **The paper-side figures below are from notes taken in an earlier session, not re-read
-from the PDF for this write-up. Re-verify against the source before citing them anywhere.**
+Verified 2026-07-26 by direct read. The paper states: *"By step 150, conversation-fine-tuned
+Llama models achieve 40% accuracy while monologue-fine-tuned models plateau around 18%."*
+Our Llama **baseline** sits at **0.176 at step 150** — where their *monologue* arm plateaus.
 
-As recorded, the paper's monologue arm plateaus around **~18%** while its dialogue arm
-reaches ~38%. Our Llama **baseline** plateaus at **0.196** — i.e. the paper's monologue
-arm performs like a model that was never usefully primed at all.
+The audit supplies the mechanism. Their monologue priming is **out-of-domain** general
+chain-of-thought over BBH/GPQA/MATH-Hard problems, which teaches Countdown very little —
+so it behaves much like no priming at all. On that reading their contrast is closer to
+"priming that transferred vs priming that didn't" than to "dialogue beats monologue."
 
-If that holds up, their contrast is not "dialogue priming beats monologue priming." It is
-"priming that worked beats priming that did nothing," and the causal weight they place on
-*dialogue* is carried by their monologue arm being broken rather than by their dialogue
-arm being special. Our monologue arms reach 0.487–0.618 on identical data, which is what a
-monologue arm looks like when the priming lands.
+Limit on this claim: the paper reports no Llama *baseline* number, only that the base model
+"learns more slowly." So we can say their monologue arm lands where *our* baseline lands;
+we cannot say it lands where *theirs* does.
 
 ## Limits — read before using any of this
 
-- **n=1 per arm per model.** No seeds, no error bars. The Qwen +0.003 and the Llama +0.081
-  both need ≥3 seeds before either is load-bearing. This is the single biggest gap and it
-  costs ~$50–60 to close on Qwen.
-- **Our teacher is stronger than theirs** (72B vs Qwen-2.5-32B-Instruct). This is applied
-  *identically to both primed arms*, so it is a controlled variable rather than a
-  confound between arms — but it does mean our absolute accuracies are not comparable to
-  the paper's, only our between-arm differences are. It plausibly explains why our arms
-  land near 0.6 where theirs land at 0.18–0.38.
-- **Length confound unresolved.** Dialogue priming = 1.8× tokens. Not yet separated from
-  dialogue structure.
+- **Priming domain differs from the paper's — this is the big one.** They prime on 8,262
+  out-of-domain reasoning problems; we prime on Countdown. Different experiment. See
+  `docs/paper_fidelity_audit.md` §4.1. Fixing this, not seeds, is the top priority.
+- **Our Llama dialogue arm is not length-matched, theirs is.** The paper explicitly
+  concatenates personas into one `<think>` block for Llama "to ensure comparable sequence
+  lengths." We didn't, so our +0.081 carries the full 1.8× length confound and is **not
+  comparable to their Llama result.** Weakest number in the set.
+- **`rollout.n=1` vs their 4**, train batch 256 vs 128, eval every 25 steps vs 10, SFT 3
+  epochs vs 5, SFT batch 32 vs 64, context 1536 vs 2048. Six mechanical deviations, all
+  cheap to fix.
+- **n=1 per arm per model.** No seeds, no error bars. Real, but *item 6* — seeds bound how
+  precisely we can state our own numbers; they do not close the gap to the paper.
+- **Our teacher is stronger than theirs** (72B vs Qwen-2.5-32B-IT — OpenRouter does not
+  host the 32B). Applied *identically to both primed arms*, so controlled between arms, but
+  it inflates our absolutes relative to theirs.
 - **250 steps is the paper's own horizon**, not a truncation of it. We are not reporting a
   gap that closes past where they stopped looking; it closes inside their window.
 
