@@ -140,4 +140,12 @@ DEVIATIONS: dict[str, str] = {
         "per subtask with a fixed seed. Sampling difference within an identical pool "
         "composition, not a design difference."
     ),
+    "gpqa_source_repo": (
+        "The canonical GPQA repo (Idavidrein/gpqa) is gated and our HF token lacks "
+        "access, so `rl.pool_build` falls back to the open mirror Wanfq/gpqa. The "
+        "mirror carries identical per-config counts (diamond 198 / main 448 / extended "
+        "546) and the same column schema, and the canonical repo is still tried first, "
+        "so this changes the source of the bytes and not the problems. Remove this "
+        "entry once the gate is accepted on the Hub."
+    ),
 }

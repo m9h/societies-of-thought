@@ -90,14 +90,32 @@ def load_bbh(counts: dict[str, int]) -> list[dict]:
     return out
 
 
-def load_gpqa(counts: dict[str, int]) -> list[dict]:
+# The canonical GPQA repo is gated. `Wanfq/gpqa` is an open mirror carrying identical
+# per-config counts (diamond 198 / main 448 / extended 546) and the same column schema.
+# Preference order: canonical first, mirror only if the canonical repo is unreachable.
+GPQA_REPOS = ("Idavidrein/gpqa", "Wanfq/gpqa")
+
+
+def _load_gpqa_config(cfg: str):
     from datasets import load_dataset
 
+    last = None
+    for repo in GPQA_REPOS:
+        try:
+            return load_dataset(repo, cfg, split="train"), repo
+        except Exception as e:  # gated / unauthenticated / offline
+            last = e
+    raise RuntimeError(f"no GPQA source reachable for {cfg}: {last}")
+
+
+def load_gpqa(counts: dict[str, int]) -> list[dict]:
     cfg = {"gpqa_diamond": "gpqa_diamond", "gpqa_extended": "gpqa_extended",
            "gpqa_main": "gpqa_main"}
     out = []
     for sub, n in counts.items():
-        ds = load_dataset("Idavidrein/gpqa", cfg[sub], split="train")
+        ds, repo = _load_gpqa_config(cfg[sub])
+        if repo != GPQA_REPOS[0]:
+            print(f"  note: {sub} via open mirror {repo} (canonical repo gated)")
         for i, r in enumerate(_take(ds, n)):
             correct = r["Correct Answer"].strip()
             opts = [correct, r["Incorrect Answer 1"], r["Incorrect Answer 2"],
@@ -143,9 +161,11 @@ def load_mmlu_pro(n: int) -> list[dict]:
 def load_musr(counts: dict[str, int]) -> list[dict]:
     from datasets import load_dataset
 
+    # The Hub split is pluralised for one subtask; Table 9 names it in the singular.
+    split_name = {"object_placement": "object_placements"}
     out = []
     for sub, n in counts.items():
-        ds = load_dataset("TAUR-Lab/MuSR", split=sub)
+        ds = load_dataset("TAUR-Lab/MuSR", split=split_name.get(sub, sub))
         for i, r in enumerate(_take(ds, n)):
             choices = r["choices"]
             if isinstance(choices, str):
