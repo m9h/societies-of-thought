@@ -103,3 +103,21 @@ dialogue-primed model solves ~20% of Countdown before RL, vs the base model's ~0
 priming head-start is real and immediate; the question C5 answers is whether it also
 learns *faster* than the length-matched-longer monologue arm, or whether the 1.8x-token
 priming advantage explains it. Curves per arm to be compared at matched steps on finish.
+
+### C5 / Claim B — COMPLETE 2026-07-26
+
+Both base models finished all three arms at the 250-step cap. Full curves in
+`results/claimB/curves.json`; interpretation and limits in `results/claimB/FINDINGS.md`.
+
+| base model | baseline | dialogue | monologue | dialogue − monologue |
+|---|---|---|---|---|
+| Qwen2.5-3B (the paper's) | 0.597 | 0.621 | 0.618 | +0.003 |
+| Llama-3.2-3B | 0.196 | 0.568 | 0.487 | +0.081 |
+
+The two models disagree. On the paper's own base model the dialogue advantage is
+transient and gone by matched-step 250, and a no-priming baseline arrives at the same
+place. On Llama the baseline never learns (plateau ~0.19) and dialogue keeps a ~0.08 lead
+that does not close. Both results are n=1 per arm — seeds are now the binding gap, not
+compute.
+
+Cost: ~$114 of RunPod balance across both models (six PPO runs + four SFT primings).

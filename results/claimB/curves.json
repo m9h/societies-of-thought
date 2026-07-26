@@ -1,0 +1,25 @@
+{
+  "experiment": "Claim B / C5 -- dialogue-SFT vs monologue-SFT priming, then identical PPO",
+  "design": "Three arms share ONE prompt template ending at 'Assistant:' (no pre-opened <think>) and ONE PPO config recovered verbatim from Tier-0. The only difference across arms is the starting weights: base / dialogue-primed / monologue-primed. PPO set is TinyZero's own countdown parquet with only the prompt string swapped (rl.claimB_data.rewrite_ppo_prompt).",
+  "metric": "val/test_score/countdown (verl stock Countdown scorer, 1312 held-out problems)",
+  "steps_capped_at": 250,
+  "seeds_per_arm": 1,
+  "caveat": "n=1 per arm per model. No error bars. Differences under ~0.03 are not distinguishable from run-to-run noise at this n.",
+  "models": {
+    "Qwen/Qwen2.5-3B": {
+      "note": "the base model the SoT paper uses for Claim B",
+      "steps":     [25, 50, 75, 100, 125, 150, 175, 200, 225, 250],
+      "baseline":  [0.214, 0.256, 0.489, 0.532, 0.572, 0.585, 0.571, 0.601, 0.604, 0.597],
+      "dialogue":  [0.331, 0.446, 0.522, 0.559, 0.586, 0.598, 0.615, 0.620, 0.625, 0.621],
+      "monologue": [0.274, 0.423, 0.483, 0.567, 0.610, 0.601, 0.643, 0.637, 0.635, 0.618]
+    },
+    "meta-llama/Llama-3.2-3B": {
+      "note": "second base model, run to test whether the Qwen convergence is model-specific",
+      "steps":     [25, 50, 75, 100, 125, 150, 175, 200, 225, 250],
+      "baseline":  [0.081, 0.183, 0.191, 0.197, 0.212, 0.176, 0.188, 0.188, 0.191, 0.196],
+      "dialogue":  [0.263, 0.361, 0.419, 0.498, 0.542, 0.557, 0.555, 0.567, 0.583, 0.568],
+      "monologue": [0.235, 0.305, 0.389, 0.435, 0.476, 0.497, 0.481, 0.505, 0.420, 0.487]
+    }
+  },
+  "logs": "raw verl logs archived on the Spark at ~/claimB_logs/ (Qwen) and ~/claimB_logs/llama_final/ (Llama)"
+}
