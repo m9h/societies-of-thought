@@ -101,6 +101,11 @@ if [ "$ARM" != "baseline" ] && [ ! -f "$CKPT/config.json" ]; then
 fi
 
 # --- 5. the identical PPO, from this arm's starting weights ---------------------
+# SAVE_FREQ=-1 (no mid-run PPO checkpoints) by default. Each verl checkpoint is ~16GB
+# of actor+critic+optimiser state; at save_freq=100 three finished arms left 147GB on a
+# 200GB disk and the NEXT run died mid-save with "No space left on device" at step 100.
+# The result of this experiment is the val curve in the log, not the weights, so do not
+# write them. Set SAVE_FREQ=100 deliberately if a run's weights are actually wanted.
 BASE_MODEL="$MODEL"; [ "$ARM" != "baseline" ] && BASE_MODEL="$CKPT"
 echo "$(date -Is) PPO $ARM from $BASE_MODEL"
 setsid nohup python3 -m verl.trainer.main_ppo \
@@ -124,7 +129,7 @@ setsid nohup python3 -m verl.trainer.main_ppo \
   algorithm.kl_ctrl.kl_coef=0.001 \
   trainer.logger=['console'] +trainer.val_before_train=False \
   trainer.default_hdfs_dir=null trainer.n_gpus_per_node="$N_GPUS" trainer.nnodes=1 \
-  trainer.save_freq=100 trainer.test_freq=25 \
+  trainer.save_freq="${SAVE_FREQ:--1}" trainer.test_freq=25 \
   trainer.project_name=TinyZero trainer.experiment_name="countdown-claimB-$MODEL_TAG-$ARM" \
   trainer.total_epochs=15 trainer.total_training_steps="${STEPS:-250}" \
   > "$LOGD/ppo_${ARM}.log" 2>&1 < /dev/null &
