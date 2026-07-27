@@ -31,6 +31,11 @@ DATA="${DATA:-/workspace/data/claimB}"
 LLAMA_CONCAT=""; case "$MODEL_TAG" in llama*) LLAMA_CONCAT="--llama-concat";; esac
 CKPT="${CKPT:-/workspace/ckpt/$MODEL_TAG/$ARM}"
 LOGD="${LOGD:-/workspace/logs/$MODEL_TAG}"
+# ONE interpreter throughout. On runpod/pytorch images `python` is /usr/local/bin/python
+# while `python3` is /usr/bin/python3 -- different environments. Installing verl with one
+# and launching PPO with the other fails instantly with ModuleNotFoundError, silently,
+# while the pod keeps billing.
+PY="${PY:-$(command -v python || command -v python3)}"
 export HF_HOME="${HF_HOME:-/workspace/hf-cache}"
 export N_GPUS=2 ROLLOUT_TP_SIZE=2 VLLM_ATTENTION_BACKEND=XFORMERS
 export WANDB_MODE=offline PYTHONUNBUFFERED=1 PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
@@ -40,25 +45,25 @@ mkdir -p "$DATA" "$(dirname "$CKPT")" "$LOGD" /workspace/logs
 [ -d "$REPO/.git" ] || git clone -q https://github.com/m9h/societies-of-thought.git "$REPO"
 [ -d "$TZ/.git" ]   || git clone -q https://github.com/Jiayi-Pan/TinyZero.git "$TZ"
 cd "$REPO" && git pull -q || true
-python -c "import verl" 2>/dev/null || (cd "$TZ" && pip install -q -e .)
-python -c "import pandas, pyarrow" 2>/dev/null || pip install -q pandas pyarrow
+"$PY" -c "import verl" 2>/dev/null || (cd "$TZ" && "$PY" -m pip install -q -e .)
+"$PY" -c "import pandas, pyarrow" 2>/dev/null || "$PY" -m pip install -q pandas pyarrow
 # flash-attn is REQUIRED by verl PPO (actor uses use_remove_padding + flash attention);
 # Tier-0's image shipped it, this one does not. sft_prime still falls back to sdpa, but
 # PPO hard-fails without this. Prefer a prebuilt wheel; the -devel image has nvcc to build
 # if none matches. ninja speeds any source build.
 if ! python -c "import flash_attn" 2>/dev/null; then
   echo "$(date -Is) installing flash-attn (required by verl PPO) ..."
-  pip install -q ninja
-  pip install -q flash-attn --no-build-isolation \
+  "$PY" -m pip install -q ninja
+  "$PY" -m pip install -q flash-attn --no-build-isolation \
     || { echo "flash-attn install FAILED -- verl PPO cannot run" >&2; exit 1; }
 fi
 
 # --- 2. data: SFT parquets + the shared-prompt PPO parquet ----------------------
 if [ ! -f "$DATA/train.parquet" ]; then
   echo "$(date -Is) building data ..."
-  python -m rl.claimB_data --data rl/data/ood --ood $LLAMA_CONCAT --out "$DATA"   # SFT parquets (paper: OOD)
+  "$PY" -m rl.claimB_data --data rl/data/ood --ood $LLAMA_CONCAT --out "$DATA"   # SFT parquets (paper: OOD)
   python "$TZ/examples/data_preprocess/countdown.py" --local_dir "$DATA/_tz"  # stock PPO set
-  python - "$DATA" <<'PY'                                                   # swap in our prompt
+  "$PY" - "$DATA" <<'PY'                                                   # swap in our prompt
 import sys; from pathlib import Path; from rl.claimB_data import rewrite_ppo_prompt
 d = Path(sys.argv[1])
 for split in ("train", "test"):
@@ -68,7 +73,7 @@ PY
 fi
 
 # --- 3. on-pod smoke gate: fail cheap, before any long run ----------------------
-python - "$DATA" "$ARM" <<'PY' || { echo "SMOKE FAILED -- not spending GPU" >&2; exit 1; }
+"$PY" - "$DATA" "$ARM" <<'PY' || { echo "SMOKE FAILED -- not spending GPU" >&2; exit 1; }
 import sys; import pandas as pd
 d, arm = sys.argv[1], sys.argv[2]
 tr = pd.read_parquet(f"{d}/train.parquet")
@@ -100,7 +105,7 @@ if [ "$ARM" != "baseline" ] && [ ! -f "$CKPT/config.json" ]; then
   # model in nn.DataParallel, whose scatter/gather segfaults under gradient
   # checkpointing (seen: core dump at step 0). 3B full-FT fits one 80GB A100, so
   # pin to device 0; PPO below still uses both GPUs.
-  CUDA_VISIBLE_DEVICES=0 python -m rl.sft_prime --train "$DATA/sft_${ARM}_train.parquet" \
+  CUDA_VISIBLE_DEVICES=0 "$PY" -m rl.sft_prime --train "$DATA/sft_${ARM}_train.parquet" \
     --model "$MODEL" --out "$CKPT" --epochs 5 --lr 1e-5 --batch-size 4 --grad-accum 16 --max-len 2048 \
     2>&1 | tee "$LOGD/sft_${ARM}.log"
   [ -f "$CKPT/config.json" ] || { echo "priming produced no checkpoint" >&2; exit 1; }
@@ -114,7 +119,7 @@ fi
 # write them. Set SAVE_FREQ=100 deliberately if a run's weights are actually wanted.
 BASE_MODEL="$MODEL"; [ "$ARM" != "baseline" ] && BASE_MODEL="$CKPT"
 echo "$(date -Is) PPO $ARM from $BASE_MODEL"
-setsid nohup python3 -m verl.trainer.main_ppo \
+setsid nohup "$PY" -m verl.trainer.main_ppo \
   data.train_files="$DATA/train.parquet" data.val_files="$DATA/test.parquet" \
   data.train_batch_size=128 data.val_batch_size=640 \
   data.max_prompt_length=1024 data.max_response_length=1024 \
@@ -141,4 +146,14 @@ setsid nohup python3 -m verl.trainer.main_ppo \
   trainer.total_epochs=15 trainer.total_training_steps="${STEPS:-250}" \
   > "$LOGD/ppo_${ARM}.log" 2>&1 < /dev/null &
 
-echo "$(date -Is) launched PPO $ARM (pid $!). tail -f $LOGD/ppo_${ARM}.log"
+PPO_PID=$!
+# Verify it SURVIVED. A crash-on-import (e.g. wrong interpreter -> no verl) otherwise
+# leaves the pod billing for hours against a dead process, which is exactly what
+# happened once. Fail loudly instead.
+sleep 45
+if ! kill -0 "$PPO_PID" 2>/dev/null; then
+  echo "PPO DIED WITHIN 45s -- log tail:" >&2
+  tail -20 "$LOGD/ppo_${ARM}.log" >&2
+  exit 1
+fi
+echo "$(date -Is) launched PPO $ARM (pid $PPO_PID), alive at 45s. tail -f $LOGD/ppo_${ARM}.log"
