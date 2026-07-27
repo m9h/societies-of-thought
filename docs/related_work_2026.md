@@ -22,6 +22,21 @@ societies can do."
 stitched-quote incident). So each entry below marks whether the claim was read directly
 from the source, or is relayed at second hand and still needs first-hand verification.
 
+**What SoT is, and is not.** SoT is **not a multi-agent-debate paper**, and nothing below
+should be read as placing it in that literature. MAD studies *N model instances with
+separate contexts exchanging messages over rounds*. SoT studies *one model, one context
+window, one autoregressive stream*, where the "voices" are stylistic segments of a single
+generation; its instruments are SAE steering, an SEM mediation model, and an LLM judge.
+The paper's own abstract hedges accordingly -- "multi-agent-**like** interactions", "implicit
+simulation". The two literatures touch at exactly one point: SoT's SFT priming corpus
+*is* literally multi-agent dialogue (a teacher prompted to simulate 2-4 personas arguing to
+a `<group_solution>`). So the training signal is multi-agent even though the phenomenon
+studied is not.
+
+This distinction is load-bearing for the argument in S1. The MAD theorem is about
+*information asymmetry between agents*. Mapping it onto SoT is an **analogy** unless the
+theorem's assumptions are shown to hold for segments within one trace -- see S5.1.
+
 ---
 
 ## 1. The martingale result — the theory behind our redundancy finding
@@ -60,10 +75,17 @@ SoT "conversational surprise" feature produces **more voices but LOWER normalise
 diversity** — segments become more alike, not more different — while accuracy falls. We
 called that a *redundant society*.
 
-The martingale result is the formal statement of why a redundant society **cannot** help:
-zero information asymmetry ⇒ error correlation 1.0 ⇒ expected accuracy flat under
-exchange. Their result is information-theoretic and between models; ours is mechanistic
-and *within* one model. Same claim, opposite directions, independent methods.
+If the theorem transfers, it is the formal statement of why a redundant society **cannot**
+help: zero information asymmetry ⇒ error correlation 1.0 ⇒ expected accuracy flat under
+exchange. And SoT's internal society is the *maximal-correlation* case by construction --
+one set of weights, one context, so the segments cannot hold different evidence.
+
+> ⚠ **This is an analogy, not a theorem application.** Their result is information-theoretic
+> and *between models*; ours is mechanistic and *within* one model. Segments of a single
+> autoregressive trace are not agents: they are not independently sampled, they condition
+> on each other by construction, and "exchange" is just continued decoding. Whether the
+> martingale conditions hold for that object is exactly what S5.1 and S5.3 are for. Until
+> then: suggestive convergence, not derivation.
 
 This is the strongest available answer to the natural defence of the SoT paper — "you
 induced surface markers, not real diversity." The reply is: correct, and there is a
