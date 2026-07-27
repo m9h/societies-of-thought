@@ -65,8 +65,16 @@ def _open_tracker(project: str, run: str, config: dict | None):
 
 
 def bridge(log: Path, out: Path, project: str, run: str, follow: bool,
-           poll: float = 5.0, config: dict | None = None) -> int:
-    """Stream `log` into `out` (JSONL) and Trackio. Returns rows written."""
+           poll: float = 5.0, config: dict | None = None,
+           trackio: bool = False) -> int:
+    """Stream `log` into `out` (JSONL), and optionally into Trackio.
+
+    JSONL is the durable artifact and is opened FIRST. Trackio is opt-in via
+    `trackio=True`: `trackio.init()` can block trying to stand up a dashboard, and when
+    it did, the bridge produced no file at all while its process looked alive -- three
+    training arms ran with zero metrics recorded. Nothing optional gets to sit in front
+    of the thing we actually need.
+    """
     out.parent.mkdir(parents=True, exist_ok=True)
     seen: set[int] = set()
     if out.exists():  # resume without duplicating
@@ -76,10 +84,12 @@ def bridge(log: Path, out: Path, project: str, run: str, follow: bool,
             except Exception:
                 pass
 
-    tracker = _open_tracker(project, run, config)
     written = 0
     pos = 0
-    sink = out.open("a")
+    sink = out.open("a")          # create the artifact before anything can block
+    sink.write("")
+    sink.flush()
+    tracker = _open_tracker(project, run, config) if trackio else None
     try:
         while True:
             if log.exists():
@@ -122,10 +132,13 @@ def main() -> None:
     ap.add_argument("--poll", type=float, default=5.0)
     ap.add_argument("--config", type=str, default=None,
                     help="JSON blob recorded with the run (arm, model, seed, ...)")
+    ap.add_argument("--trackio", action="store_true",
+                    help="also stream to Trackio (opt-in: init can block)")
     args = ap.parse_args()
 
     cfg = json.loads(args.config) if args.config else None
-    n = bridge(args.log, args.out, args.project, args.run, args.follow, args.poll, cfg)
+    n = bridge(args.log, args.out, args.project, args.run, args.follow, args.poll, cfg,
+               trackio=args.trackio)
     print(f"{n} steps -> {args.out}")
 
 

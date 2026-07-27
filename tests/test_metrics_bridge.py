@@ -73,3 +73,21 @@ def test_bridge_tolerates_a_missing_log(tmp_path):
     """A run that has not started yet must not crash the bridge."""
     out = tmp_path / "m.jsonl"
     assert bridge(tmp_path / "nope.log", out, "p", "r", follow=False) == 0
+
+
+def test_jsonl_is_written_even_without_trackio(tmp_path):
+    """Trackio must never gate the durable artifact. When trackio.init() blocked, three
+    training arms ran with no metrics recorded while the process looked alive."""
+    log = tmp_path / "p.log"
+    log.write_text(REAL)
+    out = tmp_path / "m.jsonl"
+    assert bridge(log, out, "p", "r", follow=False) == 1
+    assert out.exists() and out.read_text().strip()
+
+
+def test_output_file_is_created_even_with_an_empty_log(tmp_path):
+    log = tmp_path / "p.log"
+    log.write_text("no metrics here\n")
+    out = tmp_path / "m.jsonl"
+    assert bridge(log, out, "p", "r", follow=False) == 0
+    assert out.exists(), "artifact must exist even before the first parsable line"
