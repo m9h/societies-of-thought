@@ -72,9 +72,15 @@ def _take(rows, n, seed=0):
     return [rows[i] for i in idx]
 
 
-def _rec(pid, source, subtask, task, answer, gradable=True) -> dict:
+def _rec(pid, source, subtask, task, answer, gradable=True, options=None) -> dict:
+    """`options` is the ordered choice list for multiple-choice items.
+
+    It is stored so the grader can accept an answer given as option TEXT, not just as
+    a letter. Without it, a model replying "10^-4 eV" to a letter-gold item scores
+    wrong, which silently removed GPQA, MMLU-Pro and MUSR from the priming corpus.
+    """
     return {"pid": pid, "source": source, "subtask": subtask, "task": task,
-            "answer": answer, "gradable": gradable}
+            "answer": answer, "gradable": gradable, "options": options or []}
 
 
 # --- per-benchmark adapters ---------------------------------------------------
@@ -126,7 +132,8 @@ def load_gpqa(counts: dict[str, int]) -> list[dict]:
             shown = [opts[k] for k in order]
             letter = LETTERS[shown.index(correct)]
             out.append(_rec(f"gpqa/{sub}/{i}", "gpqa", sub,
-                            _mc(r["Question"].strip(), shown), letter))
+                            _mc(r["Question"].strip(), shown), letter,
+                            options=shown))
     return out
 
 
@@ -153,8 +160,10 @@ def load_mmlu_pro(n: int) -> list[dict]:
     ds = load_dataset("TIGER-Lab/MMLU-Pro", split="test")
     out = []
     for i, r in enumerate(_take(ds, n)):
+        opts = list(r["options"])
         out.append(_rec(f"mmlu_pro/{i}", "mmlu_pro", r.get("category", "mixed"),
-                        _mc(r["question"], list(r["options"])), str(r["answer"]).strip()))
+                        _mc(r["question"], opts), str(r["answer"]).strip(),
+                        options=opts))
     return out
 
 
@@ -174,7 +183,8 @@ def load_musr(counts: dict[str, int]) -> list[dict]:
             gold = LETTERS[int(r["answer_index"])]
             task = f"{r['narrative']}\n\n{r['question']}\n" + "\n".join(
                 f"({LETTERS[j]}) {c}" for j, c in enumerate(choices))
-            out.append(_rec(f"musr/{sub}/{i}", "musr", sub, task, gold))
+            out.append(_rec(f"musr/{sub}/{i}", "musr", sub, task, gold,
+                            options=[str(c) for c in choices]))
     return out
 
 
@@ -191,25 +201,75 @@ def load_ifeval(n: int) -> list[dict]:
 # --- grading ------------------------------------------------------------------
 
 _NORM = re.compile(r"[\s$\\,]+")
+_PROSE = re.compile(
+    r"^(so\s+)?(the\s+)?(final\s+|correct\s+)?(answer|solution|option|choice)"
+    r"\s*(is|:|=)?\s*", re.I)
+
+
+def _unbox(a: str) -> str:
+    """Unwrap a trailing \\boxed{...}, brace-balanced."""
+    i = a.rfind("\\boxed")
+    if i < 0:
+        return a
+    j = a.find("{", i)
+    if j < 0:
+        return a
+    depth = 0
+    for k in range(j, len(a)):
+        if a[k] == "{":
+            depth += 1
+        elif a[k] == "}":
+            depth -= 1
+            if depth == 0:
+                return a[j + 1:k].strip()
+    return a
 
 
 def normalise_answer(a: str) -> str:
     a = (a or "").strip()
-    a = re.sub(r"^\(([A-P])\)$", r"\1", a)
+    a = _PROSE.sub("", a).strip()
+    a = _unbox(a).strip()
+    a = re.sub(r"^\(([A-P])\)$", r"\1", a, flags=re.I)
     a = re.sub(r"^\\text\{(.*)\}$", r"\1", a)
     return _NORM.sub("", a).lower().rstrip(".")
 
 
-def is_correct(pred: str, gold: str) -> bool:
-    """Strict-ish equality after normalisation, plus a bare-letter match for MC."""
+def _letter(a: str) -> str | None:
+    """Leading choice letter, however the model dressed it up: 'C', '(C)', 'C.',
+    'C) 10^-4 eV', 'C: foo'."""
+    a = _unbox(_PROSE.sub("", (a or "").strip()).strip()).strip()
+    m = re.match(r"^\(?([A-Pa-p])\)?\s*(?:[.):\-]|$)", a)
+    return m.group(1).upper() if m else None
+
+
+def is_correct(pred: str, gold: str, options: list[str] | None = None) -> bool:
+    """Grade an answer, tolerating how models actually write them.
+
+    Accepts a bare letter, a parenthesised letter, letter-plus-text, a \\boxed{...}
+    payload, a prose prefix ("the answer is ..."), or -- when `options` is supplied --
+    the option TEXT for a letter gold. The narrow version of this function silently
+    excluded every letter-gold benchmark from the priming corpus.
+    """
     p, g = normalise_answer(pred), normalise_answer(gold)
     if not p or not g:
         return False
     if p == g:
         return True
-    mp = re.fullmatch(r"\(?([a-p])\)?", p)
-    mg = re.fullmatch(r"\(?([a-p])\)?", g)
-    return bool(mp and mg and mp.group(1) == mg.group(1))
+
+    lp, lg = _letter(pred), _letter(gold)
+    if lp and lg and lp == lg:
+        return True
+
+    # Gold is a letter and the model answered with the option's text (or vice versa).
+    if options:
+        idx = {LETTERS[i]: normalise_answer(o) for i, o in enumerate(options)}
+        if lg and lg in idx and idx[lg] and idx[lg] == p:
+            return True
+        if lp and lp in idx and idx[lp] and idx[lp] == g:
+            return True
+        if lg and lg in idx and idx[lg] and idx[lg] in p:
+            return True
+    return False
 
 
 def build() -> list[dict]:

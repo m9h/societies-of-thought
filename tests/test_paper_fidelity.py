@@ -287,3 +287,43 @@ def test_ood_llama_concat_flag_length_matches(tmp_path):
     assert "<persona1>" in plain and "<persona1>" not in concat
     assert concat.count("<think>") == 1
     assert "x" in concat and "y" in concat
+
+
+# --- the answer grader (this bug class has now cost this project four times) ----
+
+
+@pytest.mark.parametrize("pred,gold,options,want", [
+    ("C", "C", None, True),
+    ("(C)", "C", None, True),
+    ("C. 10^-4 eV", "C", None, True),          # letter + text
+    ("The answer is (C)", "C", None, True),    # prose prefix
+    (r"\boxed{C}", "C", None, True),           # LaTeX box
+    ("10^-4 eV", "B", ["5 eV", "10^-4 eV", "3 J"], True),   # option TEXT for letter gold
+    ("3 J", "B", ["5 eV", "10^-4 eV", "3 J"], False),       # wrong option
+    ("yes", "yes", None, True),
+    (r"\boxed{\frac{1}{2}}", r"\frac{1}{2}", None, True),
+    ("", "C", None, False),
+])
+def test_grader_accepts_how_models_actually_answer(pred, gold, options, want):
+    """A grader that only accepts a bare letter silently removed GPQA, MMLU-Pro and
+    MUSR from the priming corpus -- 3 of the pool's 6 benchmarks -- leaving it 81% BBH.
+    Same bug class as the \\boxed{} grading failure and the RL reward container."""
+    from rl.pool_build import is_correct
+
+    assert is_correct(pred, gold, options) is want
+
+
+def test_multiple_choice_pool_records_carry_options():
+    """Letter-gold sources must ship their choice list or the grader cannot match text."""
+    import json
+
+    f = Path(__file__).resolve().parents[1] / "rl" / "data" / "pool.json"
+    if not f.exists():
+        pytest.skip("pool not built yet")
+    pool = json.loads(f.read_text())
+    for src in ("gpqa", "mmlu_pro", "musr"):
+        rows = [r for r in pool if r["source"] == src]
+        assert rows, f"{src} missing from pool"
+        assert all(r.get("options") for r in rows), (
+            f"{src} records lack options; text answers would be graded wrong"
+        )

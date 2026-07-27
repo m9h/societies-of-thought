@@ -117,7 +117,9 @@ def generate_shard(shard: int, n_shards: int, attempt: int, seed: int = 0,
         if ma is None:
             why["no_monologue_answer"] += 1
             continue
-        dok, mok = is_correct(da, p["answer"]), is_correct(ma, p["answer"])
+        opts = p.get("options") or None
+        dok = is_correct(da, p["answer"], opts)
+        mok = is_correct(ma, p["answer"], opts)
         if not (dok and mok):
             why["both_wrong" if not (dok or mok) else
                 ("monologue_wrong" if dok else "dialogue_wrong")] += 1

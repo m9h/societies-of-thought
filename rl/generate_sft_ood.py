@@ -121,7 +121,9 @@ def main() -> None:
         da, ma = extract_dialogue_answer(d), extract_monologue_answer(m)
         if da is None or ma is None:
             continue
-        if not (is_correct(da, p["answer"]) and is_correct(ma, p["answer"])):
+        opts = p.get("options") or None
+        if not (is_correct(da, p["answer"], opts)
+                and is_correct(ma, p["answer"], opts)):
             continue
         matched.append({"pid": p["pid"], "source": p["source"], "subtask": p["subtask"],
                         "task": p["task"], "answer": p["answer"],
