@@ -121,6 +121,39 @@ def sft_records(json_path, arm: str) -> list[dict]:
     return out
 
 
+def sft_records_ood(json_path, arm: str, llama_concat: bool = False) -> list[dict]:
+    """[{pid, prompt, response}] for the paper's OUT-OF-DOMAIN priming set.
+
+    Differs from `sft_records` in two ways that both follow the paper:
+
+    1. **The prompt is the problem itself**, not a Countdown prompt. The priming
+       problems come from the 8,262-problem general-reasoning pool and have no
+       `numbers`/`target`. The paper: models "learn to reproduce the full output
+       sequence ... given only the problem as input".
+
+    2. **The trace is NOT rewritten into <answer>.** `sft_records` normalises
+       <group_consensus> -> <answer> so TinyZero's Countdown scorer can read a dialogue
+       output. That was a Countdown-specific device from when priming was in-domain.
+       Here the priming task and the RL task are different by construction, and the
+       paper primes on the raw traces: the dialogue arm learns to end in
+       <group_solution>, and RL is what must pull it toward the <answer> format the
+       reward requires. Normalising here would hand the dialogue arm a head start the
+       paper does not give it.
+
+    `llama_concat` applies the paper's Llama-only control, collapsing personas into a
+    single <think> block to length-match the conditions.
+    """
+    rows = json.loads(Path(json_path).read_text())
+    out = []
+    for r in rows:
+        trace = r[arm].strip()
+        if arm == "dialogue" and llama_concat:
+            trace = concatenate_personas(trace)
+        out.append({"pid": r["pid"], "source": r.get("source", ""),
+                    "prompt": r["task"], "response": trace})
+    return out
+
+
 def ppo_records(rows: list[dict], split: str) -> list[dict]:
     """verl RL parquet schema, matching TinyZero's countdown.py output columns so the
     stock 'countdown' reward function grades it -- but with our shared prompt."""

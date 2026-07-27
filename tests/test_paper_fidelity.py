@@ -234,3 +234,56 @@ def test_llama_concatenation_produces_a_single_think_block():
 def test_every_deviation_is_declared_with_a_reason():
     for name, reason in S.DEVIATIONS.items():
         assert len(reason) > 60, f"deviation {name!r} needs a real reason, not a stub"
+
+
+# --- out-of-domain priming records ------------------------------------------
+
+
+def _ood_fixture(tmp_path, arm, trace):
+    import json
+
+    p = tmp_path / f"{arm}.json"
+    p.write_text(json.dumps([{"pid": "bbh/navigate/0", "source": "bbh",
+                              "subtask": "navigate", "task": "Q: turn left. Where?",
+                              "answer": "yes", arm: trace}]))
+    return p
+
+
+def test_ood_sft_prompt_is_the_problem_not_countdown(tmp_path):
+    """Priming prompts must be the OOD problem; a Countdown prompt would mean we
+    primed on the RL task again."""
+    from rl.claimB_data import sft_records_ood
+
+    p = _ood_fixture(tmp_path, "monologue", "<think> t </think> yes")
+    rec = sft_records_ood(p, "monologue")[0]
+    assert rec["prompt"] == "Q: turn left. Where?"
+    assert "Using the numbers" not in rec["prompt"]
+    assert "Assistant:" not in rec["prompt"]
+
+
+def test_ood_sft_does_not_rewrite_group_solution(tmp_path):
+    """The paper primes on raw traces; rewriting <group_solution> into <answer> would
+    give the dialogue arm a format head start RL is supposed to have to earn."""
+    from rl.claimB_data import sft_records_ood
+
+    trace = ("<cast_of_characters><persona1>a</persona1></cast_of_characters>"
+             "<conversation><think1> x </think1></conversation>"
+             "<group_solution> yes </group_solution>")
+    p = _ood_fixture(tmp_path, "dialogue", trace)
+    rec = sft_records_ood(p, "dialogue")[0]
+    assert "<group_solution>" in rec["response"]
+    assert "<answer>" not in rec["response"]
+
+
+def test_ood_llama_concat_flag_length_matches(tmp_path):
+    from rl.claimB_data import sft_records_ood
+
+    trace = ("<cast_of_characters><persona1>a</persona1></cast_of_characters>"
+             "<conversation><think1> x </think1><think2> y </think2></conversation>"
+             "<group_solution> yes </group_solution>")
+    p = _ood_fixture(tmp_path, "dialogue", trace)
+    plain = sft_records_ood(p, "dialogue", llama_concat=False)[0]["response"]
+    concat = sft_records_ood(p, "dialogue", llama_concat=True)[0]["response"]
+    assert "<persona1>" in plain and "<persona1>" not in concat
+    assert concat.count("<think>") == 1
+    assert "x" in concat and "y" in concat
