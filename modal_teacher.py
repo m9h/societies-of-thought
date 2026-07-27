@@ -96,24 +96,39 @@ def generate_shard(shard: int, n_shards: int, attempt: int, seed: int = 0) -> di
     dia = chat([dialogue_prompt(p["task"], n) for p, n in zip(problems, ns)])
     mon = chat([monologue_prompt(p["task"]) for p in problems])
 
-    matched = []
+    # Count WHY instances are dropped. A silently over-strict grader would bias which
+    # problems reach the priming set, so the rejection profile is reported, not assumed.
+    matched, why = [], {"bad_dialogue_tags": 0, "no_dialogue_answer": 0,
+                        "no_monologue_answer": 0, "dialogue_wrong": 0,
+                        "monologue_wrong": 0, "both_wrong": 0, "kept": 0}
     for p, d, m in zip(problems, dia, mon):
         if not well_formed_dialogue(d):
+            why["bad_dialogue_tags"] += 1
             continue
         da, ma = extract_dialogue_answer(d), extract_monologue_answer(m)
-        if da is None or ma is None:
+        if da is None:
+            why["no_dialogue_answer"] += 1
             continue
-        if not (is_correct(da, p["answer"]) and is_correct(ma, p["answer"])):
+        if ma is None:
+            why["no_monologue_answer"] += 1
             continue
+        dok, mok = is_correct(da, p["answer"]), is_correct(ma, p["answer"])
+        if not (dok and mok):
+            why["both_wrong" if not (dok or mok) else
+                ("monologue_wrong" if dok else "dialogue_wrong")] += 1
+            continue
+        why["kept"] += 1
         matched.append({**{k: p[k] for k in ("pid", "source", "subtask", "task",
                                              "answer")},
                         "dialogue": d.strip(), "monologue": m.strip()})
+    print(f"shard {shard} rejection profile: {why}", flush=True)
 
     # Write before returning: a dying worker must cost one shard, not the run.
     Path(f"/out/shard_{shard:03d}.json").write_text(json.dumps(matched))
     out.commit()
     print(f"shard {shard}: {len(matched)}/{len(problems)} matched-correct", flush=True)
-    return {"shard": shard, "attempted": len(problems), "matched": len(matched)}
+    return {"shard": shard, "attempted": len(problems),
+            "matched": len(matched), "why": why}
 
 
 @app.function(image=image, volumes={"/out": out}, timeout=20 * 60, env=ENV)
