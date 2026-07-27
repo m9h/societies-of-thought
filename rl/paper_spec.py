@@ -140,6 +140,16 @@ DEVIATIONS: dict[str, str] = {
         "per subtask with a fixed seed. Sampling difference within an identical pool "
         "composition, not a design difference."
     ),
+    "rl_prompt_scaffold": (
+        "The paper quotes the Countdown INSTRUCTION only. We wrap it in TinyZero's "
+        "conversation scaffold ending 'Assistant:' because verl's Countdown scorer "
+        "locates the response by splitting on that marker and returns None (score 0) "
+        "without it -- a bare instruction zeroes every rollout regardless of output. "
+        "The paper's instruction text sits verbatim inside our prompt, so the scaffold "
+        "adds only the marker. Corroborated: the paper reports a baseline PPO reward of "
+        "0.5665 at 250 steps and our scaffolded baseline reached 0.597, while the bare "
+        "prompt gives a structural 0.000."
+    ),
     "gpqa_source_repo": (
         "The canonical GPQA repo (Idavidrein/gpqa) is gated and our HF token lacks "
         "access, so `rl.pool_build` falls back to the open mirror Wanfq/gpqa. The "

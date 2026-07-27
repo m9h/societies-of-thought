@@ -189,11 +189,33 @@ def ppo_records(rows: list[dict], split: str) -> list[dict]:
     return out
 
 
-def rewrite_ppo_prompt(in_path, out_path, paper: bool = True) -> int:
+def rewrite_ppo_prompt(in_path, out_path, bare: bool = False) -> int:
     """Rewrite an existing TinyZero countdown parquet to use the intended prompt.
 
-    `paper=True` (default) writes the paper's verbatim prompt; `paper=False` writes the
-    shared "Assistant:"-terminated prompt used by the in-domain runs.
+    Default writes the scaffolded prompt: TinyZero's conversation wrapper + the paper's
+    instruction VERBATIM + "Assistant:". `bare=True` writes the paper's instruction
+    alone and MUST NOT be used with the stock Countdown scorer -- see below.
+
+    Why the scaffold is required, not a deviation of convenience
+    -----------------------------------------------------------
+    verl's Countdown scorer locates the model's response by splitting on a marker:
+
+        if "Assistant:" in solution_str: ...
+        elif "<|im_start|>assistant" in solution_str: ...
+        else: return None          # -> score 0, unconditionally
+
+    A prompt without that marker makes EVERY rollout score zero regardless of what the
+    model produces. We learned this the expensive way: switching to the paper's bare
+    instruction produced val 0.000 at every step for 170 steps on the dialogue arm AND
+    on the un-primed baseline. A 64-sample probe on base Qwen2.5-3B confirmed the model
+    was fine -- it emitted <answer> in 48/64 completions under the scaffold vs 16/64
+    without it -- while the scorer could not see any of them.
+
+    The paper's instruction text is contained verbatim inside COUNTDOWN_PROMPT, so the
+    scaffold adds the marker the scorer needs and changes nothing the paper specifies.
+    Corroboration that this is what the paper ran: the paper reports a baseline PPO
+    reward of 0.5665 at 250 steps, and our scaffolded baseline reached 0.597 -- while
+    the bare prompt yields a structural 0.000.
 
     Faithfulness trick: build the PPO set with TinyZero's own countdown.py (identical
     problems, splits and sizes to Tier-0/Claim A), then swap only the prompt string.
@@ -208,7 +230,7 @@ def rewrite_ppo_prompt(in_path, out_path, paper: bool = True) -> int:
     for i in range(len(df)):
         gt = df.at[i, "reward_model"]["ground_truth"]
         nums, target = list(gt["numbers"]), int(gt["target"])
-        builder = make_paper_prompt if paper else make_prompt
+        builder = make_paper_prompt if bare else make_prompt
         new = [{"role": "user", "content": builder(nums, target)}]
         assert str(target) in new[0]["content"], "prompt lost the target"
         df.at[i, "prompt"] = new

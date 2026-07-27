@@ -78,9 +78,12 @@ import sys; import pandas as pd
 d, arm = sys.argv[1], sys.argv[2]
 tr = pd.read_parquet(f"{d}/train.parquet")
 p0 = tr.iloc[0]["prompt"][0]["content"]
-assert p0.startswith("Using the numbers"), "PPO prompt is not the paper's"
-assert "A conversation between User and Assistant" not in p0, "chat wrapper leaked in"
-assert not p0.rstrip().endswith("Assistant:"), "PPO prompt still TinyZero-wrapped"
+# The scorer returns None (score 0) unless it can find a response marker. A prompt
+# without it silently zeroes every rollout -- this cost a 170-step run once.
+assert ("Assistant:" in p0) or ("<|im_start|>assistant" in p0), \
+    "PPO prompt lacks the marker verl's Countdown scorer splits on -- all scores would be 0"
+assert "create an equation that equals" in p0, "paper's instruction text missing"
+assert "<answer>" in p0, "prompt does not request the answer container"
 assert not p0.rstrip().endswith("<think>"), "PPO prompt pre-opens <think>"
 assert tr.iloc[0]["data_source"] == "countdown", "stock scorer key lost"
 if arm != "baseline":

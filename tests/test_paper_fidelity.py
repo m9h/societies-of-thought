@@ -352,3 +352,36 @@ def test_paper_rl_prompt_matches_the_spec_string():
     from rl.claimB_data import make_paper_prompt
 
     assert make_paper_prompt([1, 2], 3) == S.RL_PROMPT.format(numbers=[1, 2], target=3)
+
+
+# --- the scorer's response marker (cost a 170-step run) -----------------------
+
+
+def test_ppo_prompt_carries_the_scorer_marker():
+    """verl's Countdown extract_solution splits on "Assistant:" (or the im_start
+    variant) and returns None otherwise, which scores 0 unconditionally. A prompt
+    lacking the marker silently zeroes every rollout: we burned a 170-step dialogue
+    run and a baseline run discovering this."""
+    from rl.claimB_data import make_prompt
+
+    p = make_prompt([79, 17, 60], 36)
+    assert ("Assistant:" in p) or ("<|im_start|>assistant" in p)
+
+
+def test_ppo_prompt_contains_the_papers_instruction_verbatim():
+    """The scaffold must ADD a marker, not alter what the paper specifies."""
+    from rl.claimB_data import make_prompt
+
+    instruction = S.RL_PROMPT.format(numbers=[79, 17, 60], target=36)
+    assert instruction in make_prompt([79, 17, 60], 36)
+
+
+def test_bare_paper_prompt_is_not_scorable_and_is_not_the_default():
+    """Pin the trap itself so nobody re-introduces it."""
+    import inspect
+
+    from rl.claimB_data import make_paper_prompt, rewrite_ppo_prompt
+
+    bare = make_paper_prompt([79, 17, 60], 36)
+    assert "Assistant:" not in bare and "<|im_start|>assistant" not in bare
+    assert inspect.signature(rewrite_ppo_prompt).parameters["bare"].default is False
