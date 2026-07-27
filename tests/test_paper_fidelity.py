@@ -327,3 +327,28 @@ def test_multiple_choice_pool_records_carry_options():
         assert all(r.get("options") for r in rows), (
             f"{src} records lack options; text answers would be graded wrong"
         )
+
+
+# --- the RL prompt -----------------------------------------------------------
+
+
+def test_paper_rl_prompt_is_a_bare_instruction():
+    """The paper's Countdown prompt has no chat wrapper, no 'Assistant:' terminator,
+    and no pre-opened <think>."""
+    from rl.claimB_data import make_paper_prompt
+
+    p = make_paper_prompt([79, 17, 60], 36)
+    assert p.startswith("Using the numbers")
+    assert "A conversation between User and Assistant" not in p
+    assert not p.rstrip().endswith("Assistant:")
+    assert "User:" not in p and "Assistant:" not in p
+    assert "<think> </think>" in p and "<answer> </answer>" in p
+    assert "[79, 17, 60]" in p and "36" in p
+    # must not pre-open the reasoning container
+    assert not p.rstrip().endswith("<think>")
+
+
+def test_paper_rl_prompt_matches_the_spec_string():
+    from rl.claimB_data import make_paper_prompt
+
+    assert make_paper_prompt([1, 2], 3) == S.RL_PROMPT.format(numbers=[1, 2], target=3)

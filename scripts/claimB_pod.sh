@@ -27,6 +27,8 @@ MODEL_TAG="${MODEL_TAG:-qwen}"
 REPO="${REPO:-/workspace/societies-of-thought}"
 TZ="${TZ:-/workspace/TinyZero}"
 DATA="${DATA:-/workspace/data/claimB}"
+# Paper applies persona-concatenation to the LLAMA condition only, to length-match.
+LLAMA_CONCAT=""; case "$MODEL_TAG" in llama*) LLAMA_CONCAT="--llama-concat";; esac
 CKPT="${CKPT:-/workspace/ckpt/$MODEL_TAG/$ARM}"
 LOGD="${LOGD:-/workspace/logs/$MODEL_TAG}"
 export HF_HOME="${HF_HOME:-/workspace/hf-cache}"
@@ -54,7 +56,7 @@ fi
 # --- 2. data: SFT parquets + the shared-prompt PPO parquet ----------------------
 if [ ! -f "$DATA/train.parquet" ]; then
   echo "$(date -Is) building data ..."
-  python -m rl.claimB_data --data rl/data --out "$DATA"                    # SFT parquets
+  python -m rl.claimB_data --data rl/data/ood --ood $LLAMA_CONCAT --out "$DATA"   # SFT parquets (paper: OOD)
   python "$TZ/examples/data_preprocess/countdown.py" --local_dir "$DATA/_tz"  # stock PPO set
   python - "$DATA" <<'PY'                                                   # swap in our prompt
 import sys; from pathlib import Path; from rl.claimB_data import rewrite_ppo_prompt
@@ -71,19 +73,23 @@ import sys; import pandas as pd
 d, arm = sys.argv[1], sys.argv[2]
 tr = pd.read_parquet(f"{d}/train.parquet")
 p0 = tr.iloc[0]["prompt"][0]["content"]
-assert p0.rstrip().endswith("Assistant:"), "PPO prompt not the shared template"
-assert "<think>" not in p0.rsplit("Assistant", 1)[-1], "PPO prompt pre-opens <think>"
+assert p0.startswith("Using the numbers"), "PPO prompt is not the paper's"
+assert "A conversation between User and Assistant" not in p0, "chat wrapper leaked in"
+assert not p0.rstrip().endswith("Assistant:"), "PPO prompt still TinyZero-wrapped"
+assert not p0.rstrip().endswith("<think>"), "PPO prompt pre-opens <think>"
 assert tr.iloc[0]["data_source"] == "countdown", "stock scorer key lost"
 if arm != "baseline":
     s = pd.read_parquet(f"{d}/sft_{arm}_train.parquet")
     assert {"prompt", "response"} <= set(s.columns), "SFT schema missing prompt/response"
     sp = s.iloc[0]["prompt"]
-    # same TEMPLATE as the PPO prompt (different problem, so not byte-equal): both must
-    # end at "Assistant:" and share the instruction preamble, or priming is OOD under PPO.
-    assert sp.rstrip().endswith("Assistant:"), "SFT prompt not the shared template"
-    assert sp[:80] == p0[:80], "SFT and PPO prompt preambles diverge -- priming would be OOD"
+    # The paper primes on OUT-OF-DOMAIN problems, so the SFT prompt is the problem
+    # itself and MUST NOT look like the Countdown RL prompt. That difference is the
+    # experiment, not a bug: transfer is what C5 measures.
+    assert not sp.startswith("Using the numbers"), "priming looks like Countdown again"
+    assert "create an equation that equals" not in sp, "priming is in-domain"
     r0 = s.iloc[0]["response"]
-    assert "<answer>" in r0 and r0.rstrip().endswith("</answer>"), "SFT response not gradable"
+    tag = "<think>" if arm == "monologue" else "<group_solution>"
+    assert tag in r0, f"{arm} SFT response missing {tag}"
 print("smoke OK:", arm)
 PY
 

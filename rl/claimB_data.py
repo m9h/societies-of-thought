@@ -53,8 +53,26 @@ _END_ANSWER = re.compile(r"</answer>", re.I)
 
 
 def make_prompt(numbers, target) -> str:
-    """The shared prompt. Identical for every arm; ends at 'Assistant:'."""
+    """The shared prompt. Identical for every arm; ends at 'Assistant:'.
+
+    Kept for the in-domain Countdown-primed runs. For a faithful replication use
+    `make_paper_prompt`, which is the prompt the paper actually reports.
+    """
     return COUNTDOWN_PROMPT.format(numbers=list(numbers), target=int(target))
+
+
+def make_paper_prompt(numbers, target) -> str:
+    """The paper's Countdown prompt, verbatim (Methods; `paper_spec.RL_PROMPT`).
+
+    The paper uses a bare instruction with NO chat wrapper and no trailing
+    "Assistant:". TinyZero's stock prompt adds both, plus a pre-opened `<think>` that
+    would force a dialogue-primed model's opening out of distribution. Our first run
+    used a middle option -- TinyZero's wrapper truncated at "Assistant:" -- which
+    avoided the `<think>` trap but was still not the paper's prompt.
+    """
+    from rl import paper_spec as S
+
+    return S.RL_PROMPT.format(numbers=list(numbers), target=int(target))
 
 
 _CAST_BLOCK = re.compile(r"<cast_of_characters>.*?</cast_of_characters>", re.S | re.I)
@@ -171,8 +189,11 @@ def ppo_records(rows: list[dict], split: str) -> list[dict]:
     return out
 
 
-def rewrite_ppo_prompt(in_path, out_path) -> int:
-    """Rewrite an existing TinyZero countdown parquet to use OUR shared prompt.
+def rewrite_ppo_prompt(in_path, out_path, paper: bool = True) -> int:
+    """Rewrite an existing TinyZero countdown parquet to use the intended prompt.
+
+    `paper=True` (default) writes the paper's verbatim prompt; `paper=False` writes the
+    shared "Assistant:"-terminated prompt used by the in-domain runs.
 
     Faithfulness trick: build the PPO set with TinyZero's own countdown.py (identical
     problems, splits and sizes to Tier-0/Claim A), then swap only the prompt string.
@@ -187,7 +208,8 @@ def rewrite_ppo_prompt(in_path, out_path) -> int:
     for i in range(len(df)):
         gt = df.at[i, "reward_model"]["ground_truth"]
         nums, target = list(gt["numbers"]), int(gt["target"])
-        new = [{"role": "user", "content": make_prompt(nums, target)}]
+        builder = make_paper_prompt if paper else make_prompt
+        new = [{"role": "user", "content": builder(nums, target)}]
         assert str(target) in new[0]["content"], "prompt lost the target"
         df.at[i, "prompt"] = new
         changed += 1
@@ -225,12 +247,23 @@ def main() -> None:
     ap.add_argument("--countdown-parquet", type=Path, default=None,
                     help="optional: a countdown train.parquet whose (numbers,target) "
                          "rows become the PPO set with OUR shared prompt")
+    ap.add_argument("--ood", action="store_true",
+                    help="build from the paper's OUT-OF-DOMAIN priming corpus "
+                         "(rl/data/ood) instead of the in-domain Countdown traces")
+    ap.add_argument("--llama-concat", action="store_true",
+                    help="Llama only: collapse personas into one <think> block, the "
+                         "paper's length-matching control for that model")
     args = ap.parse_args()
+
+    build = ((lambda f, a: sft_records_ood(f, a, llama_concat=args.llama_concat))
+             if args.ood else sft_records)
+    print(f"priming source: {'OUT-OF-DOMAIN (paper)' if args.ood else 'in-domain Countdown'}"
+          f"{' +llama-concat' if args.llama_concat else ''}")
 
     # SFT: one {prompt,response} parquet per arm.
     for arm in ("dialogue", "monologue"):
         for split in ("train", "val"):
-            recs = sft_records(args.data / f"{arm}_{split}.json", arm)
+            recs = build(args.data / f"{arm}_{split}.json", arm)
             _write_parquet(recs, args.out / f"sft_{arm}_{split}.parquet")
             stats = length_stats([r["response"] for r in recs])
             print(f"  sft_{arm}_{split}: {len(recs)} rows, "
@@ -238,7 +271,7 @@ def main() -> None:
 
     print("SFT parquets written. Length confound (median words):")
     for arm in ("dialogue", "monologue"):
-        recs = sft_records(args.data / f"{arm}_train.json", arm)
+        recs = build(args.data / f"{arm}_train.json", arm)
         print(f"    {arm:10} {length_stats([r['response'] for r in recs])['median_words']}")
 
 
