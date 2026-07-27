@@ -242,13 +242,24 @@ def _letter(a: str) -> str | None:
     return m.group(1).upper() if m else None
 
 
+_PAREN_LETTER = re.compile(r"\(([A-Pa-p])\)")
+
+
 def is_correct(pred: str, gold: str, options: list[str] | None = None) -> bool:
     """Grade an answer, tolerating how models actually write them.
 
-    Accepts a bare letter, a parenthesised letter, letter-plus-text, a \\boxed{...}
-    payload, a prose prefix ("the answer is ..."), or -- when `options` is supplied --
-    the option TEXT for a letter gold. The narrow version of this function silently
-    excluded every letter-gold benchmark from the priming corpus.
+    Priority matters. A prediction that DECLARES a choice letter is taken at its word
+    and never falls through to text matching. Without that rule, an answer reading
+    "(B) tanh(J/T) ..." against gold "D" was scored CORRECT because option D's text
+    happened to appear later in the sentence -- putting wrong traces into a corpus the
+    paper requires to be correct. Two such inversions were found by auditing the
+    generated corpus (gpqa_main/319, gpqa_diamond/56).
+
+    Order:
+      1. exact match after normalisation
+      2. a letter the prediction states up front, compared to the gold letter
+      3. a single unambiguous parenthesised letter anywhere ("Freya (B) is the ...")
+      4. option TEXT for a letter gold, only if no OTHER option is also mentioned
     """
     p, g = normalise_answer(pred), normalise_answer(gold)
     if not p or not g:
@@ -256,19 +267,26 @@ def is_correct(pred: str, gold: str, options: list[str] | None = None) -> bool:
     if p == g:
         return True
 
-    lp, lg = _letter(pred), _letter(gold)
-    if lp and lg and lp == lg:
-        return True
+    lg = _letter(gold)
+    lp = _letter(pred)
+    if lp is None and options:
+        # "Freya (B) is the most likely murderer" -- authoritative only if unambiguous.
+        found = {m.group(1).upper() for m in _PAREN_LETTER.finditer(pred or "")}
+        if len(found) == 1:
+            lp = found.pop()
+    if lp is not None:
+        # The prediction committed to a letter. Believe it, and stop.
+        return bool(lg and lp == lg)
 
-    # Gold is a letter and the model answered with the option's text (or vice versa).
-    if options:
+    if options and lg:
         idx = {LETTERS[i]: normalise_answer(o) for i, o in enumerate(options)}
-        if lg and lg in idx and idx[lg] and idx[lg] == p:
-            return True
-        if lp and lp in idx and idx[lp] and idx[lp] == g:
-            return True
-        if lg and lg in idx and idx[lg] and idx[lg] in p:
-            return True
+        want = idx.get(lg)
+        if want:
+            if want == p:
+                return True
+            if want in p and not any(
+                    t and t != want and t in p for L, t in idx.items() if L != lg):
+                return True
     return False
 
 
