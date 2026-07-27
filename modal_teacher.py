@@ -60,7 +60,8 @@ GPU = "A100-80GB:2"
 @app.function(image=image, gpu=GPU, volumes={"/cache": cache, "/out": out},
               timeout=90 * 60, env=ENV, retries=1,
               secrets=[modal.Secret.from_name("huggingface-secret")])
-def generate_shard(shard: int, n_shards: int, attempt: int, seed: int = 0) -> dict:
+def generate_shard(shard: int, n_shards: int, attempt: int, seed: int = 0,
+                   offset: int = 0, tag: str = "a") -> dict:
     """Generate dialogue+monologue for this shard's slice and keep matched-correct."""
     import json
     import random
@@ -76,8 +77,12 @@ def generate_shard(shard: int, n_shards: int, attempt: int, seed: int = 0) -> di
     pool = [r for r in pool if r["gradable"]]
     rng = random.Random(seed)
     rng.shuffle(pool)
-    problems = pool[:attempt][shard::n_shards]
-    print(f"shard {shard}/{n_shards}: {len(problems)} problems", flush=True)
+    # `offset` lets a later run cover only problems the first run never attempted, so a
+    # top-up costs the remainder rather than a full regeneration. The shuffle is seeded,
+    # so pool[offset:offset+attempt] is a stable, disjoint slice across runs.
+    problems = pool[offset:offset + attempt][shard::n_shards]
+    print(f"shard {tag}{shard}/{n_shards}: {len(problems)} problems "
+          f"(offset {offset})", flush=True)
 
     from vllm import LLM, SamplingParams
 
@@ -121,13 +126,13 @@ def generate_shard(shard: int, n_shards: int, attempt: int, seed: int = 0) -> di
         matched.append({**{k: p[k] for k in ("pid", "source", "subtask", "task",
                                              "answer")},
                         "dialogue": d.strip(), "monologue": m.strip()})
-    print(f"shard {shard} rejection profile: {why}", flush=True)
+    print(f"shard {tag}{shard} rejection profile: {why}", flush=True)
 
     # Write before returning: a dying worker must cost one shard, not the run.
-    Path(f"/out/shard_{shard:03d}.json").write_text(json.dumps(matched))
+    Path(f"/out/shard_{tag}{shard:03d}.json").write_text(json.dumps(matched))
     out.commit()
-    print(f"shard {shard}: {len(matched)}/{len(problems)} matched-correct", flush=True)
-    return {"shard": shard, "attempted": len(problems),
+    print(f"shard {tag}{shard}: {len(matched)}/{len(problems)} matched-correct", flush=True)
+    return {"shard": f"{tag}{shard}", "attempted": len(problems),
             "matched": len(matched), "why": why}
 
 
@@ -189,14 +194,14 @@ def upload_pool(pool_bytes: bytes) -> int:
 
 @app.local_entrypoint()
 def main(attempt: int = 2500, shards: int = 4, seed: int = 0,
-         pool: str = "rl/data/pool.json"):
+         pool: str = "rl/data/pool.json", offset: int = 0, tag: str = "a"):
     from pathlib import Path
 
     n = upload_pool.remote(Path(pool).read_bytes())
     print(f"pool uploaded: {n} problems")
 
     results = list(generate_shard.starmap(
-        [(i, shards, attempt, seed) for i in range(shards)]))
+        [(i, shards, attempt, seed, offset, tag) for i in range(shards)]))
     tot_a = sum(r["attempted"] for r in results)
     tot_m = sum(r["matched"] for r in results)
     print(f"generated: {tot_m}/{tot_a} matched-correct "
