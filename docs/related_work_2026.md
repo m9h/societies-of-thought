@@ -126,7 +126,75 @@ MAD line are running in parallel without contact — which is the gap our work s
 
 ---
 
-## 3. Also tracking (not yet read first-hand)
+## 3. Invisible reasoning — the sharpest threat to the paper's inference
+
+**[Not All LLM Reasoning is Visible in the Chain-of-Thought](https://arxiv.org/abs/2607.22925)**
+— Baherwani, Goldstein & Panda, arXiv 2607.22925, 24 July 2026. *(abstract read directly;
+⚠ full text NOT yet read — verify before citing specifics)*
+
+> We demonstrate a concrete failure mode where frontier models exhibit invisible reasoning
+> by leveraging **semantically irrelevant filler tokens** to improve performance on
+> synthetic reasoning tasks. We evaluate 13 frontier language models across three tasks
+> and find that many models benefit significantly from filler tokens, with accuracy
+> improvements of **up to 13 percentage points**.
+
+And, critically for us:
+
+> **neither RL nor supervised fine-tuning produces a filler token benefit that persists at
+> test time**
+
+### Why this is the sharpest challenge to SoT
+
+The SoT paper's inference runs: reasoning traces *look* dialogic → dialogic structure
+*causes* the reasoning gain. Every instrument it uses reads the **semantic content** of the
+trace: an LLM judge inferring personas, an SAE feature for "conversational surprise", an SEM
+over conversational behaviours.
+
+This result says content is not reliably where the computation lives. If **semantically
+irrelevant** tokens buy up to 13 points, then observing structure in a trace and
+correlating it with accuracy cannot establish that the structure is doing the work. The
+trace can be a place computation *happens near*, not a description of what it *is*.
+
+### It promotes our length confound from caveat to candidate mechanism
+
+We have measured, on our own reconstructed corpus, that dialogue traces run **1.75×** longer
+than monologue traces (252 vs 144 median words). We have been reporting that as a confound
+to control. On this result it is better described as a **rival explanation with independent
+empirical support**: more tokens can be causal while carrying no semantic load.
+
+That reframes the paper's own asymmetry. It length-matches the dialogue condition for
+Llama-3.2-3B ("concatenated into a single block ... to ensure comparable sequence lengths")
+and **does not** for Qwen-2.5-3B. Under a filler-token account, the un-matched Qwen arm is
+exactly where a spurious dialogue advantage would appear.
+
+### And it predicts the decay we measured
+
+Our faithful out-of-domain Claim B run shows the dialogue arm leading baseline by +0.049 to
++0.081 through step 100, then decaying to **−0.008 by step 250**. Their finding that a
+filler benefit does **not persist** through RL or SFT is the same shape: a token-quantity
+effect that training washes out. Two independent setups, one prediction.
+
+> ⚠ This is a *convergence*, not a derivation. Their filler tokens are deliberately
+> meaningless; our dialogue tokens carry real content. The claim we can support is that a
+> length/quantity account is live and unexcluded — not that it is established.
+
+### The experiment it hands us
+
+A **length-matched filler control**: prime a third variant on monologue traces padded to
+dialogue length with semantically empty tokens. Three outcomes, all informative:
+
+| filler arm behaves like | conclusion |
+|---|---|
+| dialogue (early lead) | the early advantage is **token quantity**, not dialogic structure |
+| monologue (no lead) | the advantage is **content-bearing** — SoT's mechanism survives |
+| neither | something else; the design needs rethinking |
+
+This is cheap — it reuses the existing corpus and needs no new teacher generation — and it
+is the single most decisive arm we could add. It also fills the gap the paper's own Llama
+control gestures at but does not close: their concatenation equalises length *while keeping
+the dialogic content*, which is the complement of this test, not a substitute for it.
+
+## 4. Also tracking (not yet read first-hand)
 
 > ⚠ Everything in this section is from search snippets only. Read before citing.
 
@@ -145,7 +213,7 @@ MAD line are running in parallel without contact — which is the gap our work s
 
 ---
 
-## 4. How to frame our contribution
+## 5. How to frame our contribution
 
 Three literatures, and nobody is joining them:
 
@@ -171,7 +239,7 @@ The one-paragraph version:
 > and ties by step 250, matching independent reports that debate gains peak early and
 > accumulate only logarithmically.
 
-## 5. Open follow-ups this suggests
+## 6. Open follow-ups this suggests
 
 1. **Read Choi et al. 2026b** and state the martingale conditions precisely. If its
    assumptions are met by the within-model case, the connection is rigorous rather than
