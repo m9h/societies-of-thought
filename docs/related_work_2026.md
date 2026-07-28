@@ -126,73 +126,116 @@ MAD line are running in parallel without contact — which is the gap our work s
 
 ---
 
-## 3. Invisible reasoning — the sharpest threat to the paper's inference
+## 3. Invisible reasoning — the sharpest challenge to the paper's inference
 
 **[Not All LLM Reasoning is Visible in the Chain-of-Thought](https://arxiv.org/abs/2607.22925)**
-— Baherwani, Goldstein & Panda, arXiv 2607.22925, 24 July 2026. *(abstract read directly;
-⚠ full text NOT yet read — verify before citing specifics)*
+— Baherwani (NYU), Goldstein (UMD) & Panda (TogetherAI), arXiv 2607.22925, 24 July 2026.
+*(FULL TEXT read directly — this section was previously written from the abstract and
+overstated one thing; corrected below.)*
 
-> We demonstrate a concrete failure mode where frontier models exhibit invisible reasoning
-> by leveraging **semantically irrelevant filler tokens** to improve performance on
-> synthetic reasoning tasks. We evaluate 13 frontier language models across three tasks
-> and find that many models benefit significantly from filler tokens, with accuracy
-> improvements of **up to 13 percentage points**.
+Frontier models gain accuracy from **filler tokens**: fixed, semantically irrelevant
+sequences ("1 2 3 4 …", "cat dog bear …") that are identical for every problem and so
+carry no information about any particular question. Claude Opus 4.5: **+11.2** on
+multi-step arithmetic and **+10.0** on 4-digit multiplication. Gemini 3 Flash: **+10.7**
+on arithmetic. Opus 4.6 shows **+30.0**, though its API forbids assistant prefilling so
+the authors flag possible selection effects.
 
-And, critically for us:
+**Correction to what I wrote from the abstract.** I said the result shows trace *content*
+does not matter. That is too strong and misses their point. Their criteria 2 and 3 are
+that performance *does* depend on which filler tokens are used, and that preferences
+*differ across models*. The claim is sharper than "content is irrelevant": the tokens are
+**semantically** empty yet **representationally** consequential. What matters is not what
+the tokens mean but what they do to the residual stream of a particular model. Their
+mechanistic section supports this — activation patching recovers >90% of the gap between
+a strong and a weak filler type when applied at layers 0–30, and linear probes on the
+filler span decode task-relevant information from layer 15 onward.
 
-> **neither RL nor supervised fine-tuning produces a filler token benefit that persists at
-> test time**
+### The passage that matters most for us
 
-### Why this is the sharpest challenge to SoT
+Section 6.1, on what RL over filler tokens is actually doing:
 
-The SoT paper's inference runs: reasoning traces *look* dialogic → dialogic structure
-*causes* the reasoning gain. Every instrument it uses reads the **semantic content** of the
-trace: an LLM judge inferring personas, an SAE feature for "conversational surprise", an SEM
-over conversational behaviours.
+> RL training improves pass@8 but yields little gain in pass@1, suggesting that filler
+> tokens primarily affect the **diversity of model outputs** rather than the accuracy of
+> any single forward pass. … We speculate that filler tokens allow the model to
+> **internally explore multiple candidate answers within a single forward pass, with the
+> prefilled span acting as a workspace** over which different latent computations can be
+> conditioned. … models may use filler tokens as an **internal search mechanism**.
 
-This result says content is not reliably where the computation lives. If **semantically
-irrelevant** tokens buy up to 13 points, then observing structure in a trace and
-correlating it with accuracy cannot establish that the structure is doing the work. The
-trace can be a place computation *happens near*, not a description of what it *is*.
+Read that against the SoT thesis. SoT argues that reasoning improves because the model
+simulates *a society of differentiated perspectives* that explores the solution space, and
+it locates that society in the **dialogic content** of the trace. This paper reaches the
+same functional description — a workspace supporting parallel exploration of candidate
+answers — using tokens with **no dialogic content whatsoever**.
 
-### It promotes our length confound from caveat to candidate mechanism
+If the functional role SoT attributes to internal voices is reproducible with counting
+sequences and animal names, then observing personas in a trace does not establish that the
+personas are the mechanism. The society may be the *readable shadow* of a search process
+that does not require any society to run. That is precisely the account we reached
+independently from the steering and HSE results (`FINDINGS.md` §Interpretation), and this
+is the first external evidence for it.
 
-We have measured, on our own reconstructed corpus, that dialogue traces run **1.75×** longer
-than monologue traces (252 vs 144 median words). We have been reporting that as a confound
-to control. On this result it is better described as a **rival explanation with independent
-empirical support**: more tokens can be causal while carrying no semantic load.
+> ⚠ The authors mark the workspace reading as **speculative** and say they provide no
+> direct evidence that distinct candidate answers are simultaneously represented. Cite it
+> as a converging interpretation, never as an established mechanism.
 
-That reframes the paper's own asymmetry. It length-matches the dialogue condition for
-Llama-3.2-3B ("concatenated into a single block ... to ensure comparable sequence lengths")
-and **does not** for Qwen-2.5-3B. Under a filler-token account, the un-matched Qwen arm is
-exactly where a spurious dialogue advantage would appear.
+### It also predicts our Claim B result, twice over
 
-### And it predicts the decay we measured
+**First, the decay.** Our faithful out-of-domain run has dialogue leading baseline by +0.049
+to +0.081 through step 100, decaying to **−0.008 by step 250**. They report that RL
+"does not produce a filler token advantage that persists at test time."
 
-Our faithful out-of-domain Claim B run shows the dialogue arm leading baseline by +0.049 to
-+0.081 through step 100, then decaying to **−0.008 by step 250**. Their finding that a
-filler benefit does **not persist** through RL or SFT is the same shape: a token-quantity
-effect that training washes out. Two independent setups, one prediction.
+**Second, and more specifically, the SFT failure.** SoT's Claim B *is* an SFT-then-RL
+design. Appendix G:
 
-> ⚠ This is a *convergence*, not a derivation. Their filler tokens are deliberately
-> meaningless; our dialogue tokens carry real content. The claim we can support is that a
-> length/quantity account is live and unexcluded — not that it is established.
+> Across all configurations, SFT fails to transfer invisible reasoning. … The model learns
+> to reproduce filler token sequences from training data, but any accuracy gain is also
+> present without filler tokens. … The computation that makes filler tokens useful for
+> Opus 4.5 occurs in latent space. **The tokens themselves carry no transferable signal, so
+> imitating them provides no benefit.**
 
-### The experiment it hands us
+If the dialogue advantage is a latent-workspace effect rather than a content effect, then
+imitating dialogue *tokens* by SFT should fail to install it durably — which is the shape
+our curve has.
 
-A **length-matched filler control**: prime a third variant on monologue traces padded to
-dialogue length with semantically empty tokens. Three outcomes, all informative:
+### The experiment, upgraded — use their ablation, not my filler arm
 
-| filler arm behaves like | conclusion |
+I previously proposed padding monologue traces with meaningless filler. Their **trace
+ablation** is better because it is already validated in this paper: remove 
+r
+1
+ or replace it
+with random tokens and test whether downstream accuracy depends on its *content*. Their
+result under a monitor penalty is the sharpest possible version —
+
+> replacing 
+r
+1
+ with a single random token fully restores accuracy … indicating the model
+> relies only on the **presence of a token** in the 
+r
+1
+ position as a cue rather than its content.
+
+Applied to us: take the dialogue-primed checkpoint and, at evaluation, replace the persona
+and conversation content with length-matched random tokens.
+
+| result | conclusion |
 |---|---|
-| dialogue (early lead) | the early advantage is **token quantity**, not dialogic structure |
-| monologue (no lead) | the advantage is **content-bearing** — SoT's mechanism survives |
-| neither | something else; the design needs rethinking |
+| accuracy preserved | the dialogic content is inert; length/position is the mechanism |
+| accuracy collapses | the content is load-bearing and SoT's mechanism survives |
 
-This is cheap — it reuses the existing corpus and needs no new teacher generation — and it
-is the single most decisive arm we could add. It also fills the gap the paper's own Llama
-control gestures at but does not close: their concatenation equalises length *while keeping
-the dialogic content*, which is the complement of this test, not a substitute for it.
+This needs **no new training** — it runs on checkpoints we already have.
+
+### An opening they leave explicitly
+
+Their stated limitations include:
+
+> we do not evaluate fillers that repeat the question or **natural CoT text used as
+> filler**; both are natural extensions of our experiments.
+
+Our dialogue traces *are* natural CoT text, and our corpus is length-matched by
+construction against a monologue control. We are positioned to run the extension they
+name, on data that already exists.
 
 ## 4. Also tracking (not yet read first-hand)
 
