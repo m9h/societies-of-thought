@@ -9,7 +9,11 @@
 set -u
 ARM="${1:?arm}"; TAG="${2:-qwen}"
 LOG="/workspace/logs/$TAG/ppo_${ARM}.log"
-STALL_S="${STALL_S:-1800}"          # no log growth for 30 min => stalled
+STALL_S="${STALL_S:-5400}"          # measured cadence is ~165 s/step; a validation pass
+                                    # is far longer. A 1800s threshold killed a HEALTHY
+                                    # run at step 41 and cost it from scratch. 90 min is
+                                    # ~30x the step time -- generous enough that only a
+                                    # real hang trips it.
 MAX_RESTARTS="${MAX_RESTARTS:-3}"
 restarts=0
 
