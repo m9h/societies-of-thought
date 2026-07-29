@@ -17,12 +17,25 @@ STALL_S="${STALL_S:-5400}"          # measured cadence is ~165 s/step; a validat
 MAX_RESTARTS="${MAX_RESTARTS:-3}"
 restarts=0
 
-target_reached() {                   # 250 steps done?
+target_reached() {
+  # Completion must be detected by MORE than the training-step counter. verl writes its
+  # last `step:N - global_seqlen` line at N-1 (249 for a 250-step run), so a bare
+  # `>= 250` never fires -- and this watchdog restarted a COMPLETED 250-step run,
+  # wiping its log. The result survived only because rl.metrics_bridge had already
+  # written the JSONL. Three independent signals now, any one of which counts:
   [ -f "$LOG" ] || return 1
+  # 1. verl's own end-of-run marker
+  grep -q "Final validation metrics" "$LOG" 2>/dev/null && return 0
+  # 2. a validation line at or past the target step
+  local v
+  v=$(grep -oE "step:[0-9]+ - .*val/test_score" "$LOG" 2>/dev/null \
+      | grep -oE "step:[0-9]+" | grep -oE "[0-9]+" | sort -n | tail -1)
+  [ "${v:-0}" -ge "${STEPS:-250}" ] && return 0
+  # 3. the training-step counter, allowing for verl's off-by-one
   local s
   s=$(grep -oE "step:[0-9]+ - global_seqlen" "$LOG" 2>/dev/null \
       | grep -oE "[0-9]+" | sort -n | tail -1)
-  [ "${s:-0}" -ge "${STEPS:-250}" ]
+  [ "${s:-0}" -ge $(( ${STEPS:-250} - 1 )) ]
 }
 
 while true; do

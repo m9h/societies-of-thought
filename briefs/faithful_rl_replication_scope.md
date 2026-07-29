@@ -121,3 +121,26 @@ that does not close. Both results are n=1 per arm — seeds are now the binding 
 compute.
 
 Cost: ~$114 of RunPod balance across both models (six PPO runs + four SFT primings).
+
+### C5 / Claim B — FAITHFUL REPLICATION COMPLETE 2026-07-29
+
+Qwen2.5-3B, three arms, 250 steps, out-of-domain priming from the paper's teacher.
+Full write-up in `results/claimB/RESULT_faithful.md`; curves in
+`results/claimB/curves_paper_faithful.json`.
+
+| step 250 | baseline | dialogue | monologue |
+|---|---|---|---|
+| reward | 0.661 | **0.653** | **0.671** |
+
+Dialogue leads monologue by +0.043 through step 60, is caught by step 70, and finishes
+last. Both primed arms hold ~+0.04 over baseline mid-run. **The surviving variable is
+priming, not dialogue.**
+
+We reproduce the paper's only per-arm Qwen number (step 40: theirs 38/28, ours 37.7/30.4)
+and its baseline (theirs 0.5665 at 250, ours 0.661). What fails is the generalisation:
+their figure caption says the arms "eventually converge" and their abstract says dialogue
+"substantially accelerates" — our curve backs the caption.
+
+Cost: ~$180 of RunPod across the faithful run, plus ~$12 Modal for the priming corpus.
+Wasted along the way: ~$7 on pods that never ran (bad image tag, missing PUBLIC_KEY),
+~$42 on a silently dead arm, ~$30 on a bare-prompt run that scored a structural zero.
