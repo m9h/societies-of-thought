@@ -77,13 +77,22 @@ def _fake_rows():
             + [{"response": shifty, "correct": False}] * 2)
 
 
+class _FakeEncoder:
+    """Deterministic unit-norm embeddings. No model download, no dependency on the
+    embedding stack -- these tests exist to pin the single-voice branch, not the encoder."""
+
+    def encode(self, segs, **kw):
+        rng = np.random.default_rng(len(segs))
+        E = rng.normal(size=(len(segs), 8))
+        return E / np.linalg.norm(E, axis=1, keepdims=True)
+
+
 def test_zero_handling_keeps_every_trace():
     """The paper: 'If a reasoning trace contained only a single implicit voice, E = 0.'
     Single-voice traces are a measurement of zero diversity, not a missing value."""
     from analysis.hse_qwq import measure
 
-    recs, drop = measure(_fake_rows(), "sentence-transformers/all-MiniLM-L6-v2",
-                         degenerate="zero")
+    recs, drop = measure(_fake_rows(), degenerate="zero", encoder=_FakeEncoder())
     assert len(recs) == 4, "zero handling must not discard any trace"
     assert drop["handling"] == "zero"
     assert drop["correct_single_voice"] == 2
@@ -94,8 +103,7 @@ def test_zero_handling_keeps_every_trace():
 def test_drop_handling_discards_and_is_flagged():
     from analysis.hse_qwq import measure
 
-    recs, drop = measure(_fake_rows(), "sentence-transformers/all-MiniLM-L6-v2",
-                         degenerate="drop")
+    recs, drop = measure(_fake_rows(), degenerate="drop", encoder=_FakeEncoder())
     assert len(recs) < 4
     assert drop["handling"] == "drop"
 

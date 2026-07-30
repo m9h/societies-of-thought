@@ -67,8 +67,8 @@ def load_balanced(n_per_class: int, seed: int = 0, scan_cap: int = 400_000):
     return rows
 
 
-def measure(rows, model_name: str, batch: int = 256,
-            degenerate: str = "zero") -> tuple[list[dict], dict]:
+def measure(rows, model_name: str | None = None, batch: int = 256,
+            degenerate: str = "zero", encoder=None) -> tuple[list[dict], dict]:
     """Returns (per-trace records, counts of degenerate traces by class).
 
     `degenerate` controls single-voice traces -- those with too few perspective shifts to
@@ -85,11 +85,14 @@ def measure(rows, model_name: str, batch: int = 256,
           zero gives -0.0149 (correct LESS diverse). Same data, opposite conclusion,
           decided entirely by how single-voice traces are handled.
     """
-    from sentence_transformers import SentenceTransformer
+    if encoder is None:
+        from sentence_transformers import SentenceTransformer
 
     if degenerate not in ("zero", "drop"):
         raise ValueError("degenerate must be 'zero' or 'drop'")
-    enc = SentenceTransformer(model_name)
+    # `encoder` is injectable so tests can exercise the single-voice logic -- the thing
+    # that decided the sign of this result -- without downloading an embedding model.
+    enc = encoder if encoder is not None else SentenceTransformer(model_name)
     out = []
     dropped = {"correct_single_voice": 0, "incorrect_single_voice": 0,
                "correct_degenerate": 0, "incorrect_degenerate": 0,
