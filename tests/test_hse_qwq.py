@@ -60,3 +60,50 @@ def test_length_is_reported_so_the_confound_is_visible():
     s = report(recs)
     assert "words" in s["metrics"]
     assert s["metrics"]["words"]["difference"] < 0
+
+
+# --- the single-voice convention, which decides the sign of the result ---------
+
+
+def _fake_rows():
+    """Two 'correct' traces with no shift cues (single voice) and two 'incorrect' ones
+    with several, mirroring QwQ: wrong answers flail and shift more."""
+    plain = "x" * 200                                   # no SHIFT cue -> 1 segment
+    shifty = ("First we try the obvious route and it looks fine so far. "
+              "But actually that cannot be right because the parity is off. "
+              "Wait, let me reconsider the whole setup from the beginning again. "
+              "However the constraint forces the other branch entirely instead.")
+    return ([{"response": plain, "correct": True}] * 2
+            + [{"response": shifty, "correct": False}] * 2)
+
+
+def test_zero_handling_keeps_every_trace():
+    """The paper: 'If a reasoning trace contained only a single implicit voice, E = 0.'
+    Single-voice traces are a measurement of zero diversity, not a missing value."""
+    from analysis.hse_qwq import measure
+
+    recs, drop = measure(_fake_rows(), "sentence-transformers/all-MiniLM-L6-v2",
+                         degenerate="zero")
+    assert len(recs) == 4, "zero handling must not discard any trace"
+    assert drop["handling"] == "zero"
+    assert drop["correct_single_voice"] == 2
+    zs = [r for r in recs if r["single_voice"]]
+    assert len(zs) == 2 and all(r["hse_norm"] == 0.0 for r in zs)
+
+
+def test_drop_handling_discards_and_is_flagged():
+    from analysis.hse_qwq import measure
+
+    recs, drop = measure(_fake_rows(), "sentence-transformers/all-MiniLM-L6-v2",
+                         degenerate="drop")
+    assert len(recs) < 4
+    assert drop["handling"] == "drop"
+
+
+def test_default_is_the_papers_convention():
+    """Guards the exact mistake that inverted this result once."""
+    import inspect
+
+    from analysis.hse_qwq import measure
+
+    assert inspect.signature(measure).parameters["degenerate"].default == "zero"

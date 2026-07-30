@@ -67,26 +67,46 @@ def load_balanced(n_per_class: int, seed: int = 0, scan_cap: int = 400_000):
     return rows
 
 
-def measure(rows, model_name: str, batch: int = 256) -> tuple[list[dict], dict]:
-    """Returns (per-trace records, drop counts by class).
+def measure(rows, model_name: str, batch: int = 256,
+            degenerate: str = "zero") -> tuple[list[dict], dict]:
+    """Returns (per-trace records, counts of degenerate traces by class).
 
-    The MIN_SEGMENTS filter is a selection effect that runs AGAINST the null: traces with
-    too few perspective shifts to score are dropped, and correct traces have far fewer
-    shifts, so they are dropped more often. Reporting the drop counts by class is
-    mandatory -- silently filtering the low-diversity end of one group would manufacture
-    whatever result the filter favours.
+    `degenerate` controls single-voice traces -- those with too few perspective shifts to
+    build a dendrogram from:
+
+      "zero" (DEFAULT, and the paper's own convention) -- score them 0. The paper is
+          explicit: "If a reasoning trace contained only a single implicit voice, E = 0"
+          and "P_j = 0". A trace with one voice has no diversity; that is a measurement,
+          not a missing value.
+      "drop" -- exclude them. This is what we did first and it INVERTED THE RESULT.
+          The filter removes the low-diversity tail, and QwQ's correct traces have far
+          fewer shifts (13.5 vs 38.2 segments), so it removed 2.2x more correct traces
+          (314 vs 143). Dropping gave hse_norm +0.0134 (correct MORE diverse); scoring
+          zero gives -0.0149 (correct LESS diverse). Same data, opposite conclusion,
+          decided entirely by how single-voice traces are handled.
     """
     from sentence_transformers import SentenceTransformer
 
+    if degenerate not in ("zero", "drop"):
+        raise ValueError("degenerate must be 'zero' or 'drop'")
     enc = SentenceTransformer(model_name)
     out = []
-    dropped = {"correct_too_few_segments": 0, "incorrect_too_few_segments": 0,
-               "correct_degenerate": 0, "incorrect_degenerate": 0}
+    dropped = {"correct_single_voice": 0, "incorrect_single_voice": 0,
+               "correct_degenerate": 0, "incorrect_degenerate": 0,
+               "handling": degenerate}
+
+    def _zero(r, n_seg):
+        return {"correct": r["correct"], "n_segments": n_seg, "hse": 0.0,
+                "hse_norm": 0.0, "mean_dist": 0.0,
+                "words": len(r["response"].split()), "single_voice": True}
+
     for i, r in enumerate(rows):
         key = "correct" if r["correct"] else "incorrect"
         segs = segment(r["response"])
         if len(segs) < MIN_SEGMENTS:
-            dropped[f"{key}_too_few_segments"] += 1
+            dropped[f"{key}_single_voice"] += 1
+            if degenerate == "zero":
+                out.append(_zero(r, len(segs)))
             continue
         E = enc.encode(segs, normalize_embeddings=True, show_progress_bar=False,
                        batch_size=batch)
@@ -96,10 +116,13 @@ def measure(rows, model_name: str, batch: int = 256) -> tuple[list[dict], dict]:
         hse, hse_n, md = hierarchic_social_entropy(D)
         if not np.isfinite(hse):
             dropped[f"{key}_degenerate"] += 1
+            if degenerate == "zero":
+                out.append(_zero(r, len(segs)))
             continue
         out.append({"correct": r["correct"], "n_segments": len(segs),
                     "hse": float(hse), "hse_norm": float(hse_n),
-                    "mean_dist": float(md), "words": len(r["response"].split())})
+                    "mean_dist": float(md), "words": len(r["response"].split()),
+                    "single_voice": False})
         if i % 250 == 0:
             print(f"  {i}/{len(rows)}  kept {len(out)}", flush=True)
     return out, dropped
@@ -115,14 +138,17 @@ def report(recs: list[dict], dropped: dict | None = None) -> dict:
     summary = {"n_correct": len(cor), "n_incorrect": len(inc), "metrics": {},
                "dropped": dropped or {}}
     if dropped:
-        print(f"\ndropped as unscorable: {dropped}")
-        dc = dropped.get("correct_too_few_segments", 0)
-        di = dropped.get("incorrect_too_few_segments", 0)
+        print(f"\nsingle-voice traces: {dropped}")
+        dc = dropped.get("correct_single_voice", 0)
+        di = dropped.get("incorrect_single_voice", 0)
+        how = dropped.get("handling", "?")
         if dc + di:
-            print(f"  NOTE: {dc} correct vs {di} incorrect traces had <{MIN_SEGMENTS} "
-                  f"segments. This filter removes the LOW-diversity tail, and it removes "
-                  f"more from the group with fewer shifts -- it biases toward finding "
-                  f"correct traces MORE diverse than they are.")
+            print(f"  {dc} correct vs {di} incorrect traces had <{MIN_SEGMENTS} segments; "
+                  f"handling={how}.")
+            if how == "drop":
+                print("  WARNING: dropping these removes the low-diversity tail from the "
+                      "group that has fewer shifts, and INVERTS the sign of the result. "
+                      "The paper scores single-voice traces as 0. Use --degenerate zero.")
 
     print("\n" + "=" * 78)
     print("DOES DIVERSITY SEPARATE CORRECT FROM INCORRECT TRACES? (within QwQ)")
@@ -172,10 +198,13 @@ def main() -> None:
     ap.add_argument("--model", default="sentence-transformers/all-MiniLM-L6-v2")
     ap.add_argument("--out", type=Path, default=Path("results/qwq/hse_qwq.json"))
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--degenerate", choices=("zero", "drop"), default="zero",
+                    help="single-voice traces: score 0 (the paper's convention, default) "
+                         "or drop them (inverts the result -- see measure() docstring)")
     args = ap.parse_args()
 
     rows = load_balanced(args.n_per_class, args.seed)
-    recs, dropped = measure(rows, args.model)
+    recs, dropped = measure(rows, args.model, degenerate=args.degenerate)
     print(f"\nmeasured {len(recs)} traces with >= {MIN_SEGMENTS} segments")
     summary = report(recs, dropped)
 
