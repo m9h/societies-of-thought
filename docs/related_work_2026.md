@@ -237,6 +237,54 @@ Our dialogue traces *are* natural CoT text, and our corpus is length-matched by
 construction against a monologue control. We are positioned to run the extension they
 name, on data that already exists.
 
+## 3b. Prime Intellect: "Better Initializations for RL" — independent support for *priming, not dialogue*
+
+**INTELLECT-MATH** (Prime Intellect) — dataset card read directly at
+`PrimeIntellect/NuminaMath-QwQ-CoT-5M`. Subtitle:
+
+> *Frontier Mathematical Reasoning through **Better Initializations for Reinforcement Learning***
+
+> We demonstrate that the quality of our SFT data can impact the performance and **training
+> speed of the RL stage**: Due to its better synthetic SFT dataset that encourages the model
+> to imitate the reasoning behavior of a strong teacher model, INTELLECT-MATH … matches its
+> performance with **10x faster training**.
+
+This is our Claim B conclusion arrived at independently and at larger scale. They attribute
+the RL speed-up to **SFT-data quality and teacher strength** — not to any dialogic or
+multi-agent structure, which they never invoke. Their framing of pre-RL SFT as an
+*initialisation* problem is the same account we reached: priming changes how fast RL gets
+going, not where it ends up.
+
+Worth noting against SoT specifically: SoT holds teacher and problems fixed and varies only
+trace *form*, concluding that form is causal. Prime Intellect varies teacher *quality* and
+finds a large effect on RL speed. Two studies, one axis each; the one that moved a big lever
+moved teacher quality, not conversational structure.
+
+### The dataset is also our cheapest remaining experiment
+
+`PrimeIntellect/NuminaMath-QwQ-CoT-5M` — **MIT**, **5,138,102** traces, 43.8 GB, fields
+`problem_id / prompt / response / ground_truth / correct`.
+
+Those are **QwQ** traces. QwQ-32B is one of the two models SoT builds its descriptive claim
+(D) and diversity claim (C3) on, and SoT measures diversity with an LLM judge over **8,262**
+traces. Our HSE instrument (`analysis/hse.py`) is judge-free and needs only trace text, so
+this corpus supports the same measurement at **~600× the sample size on the paper's own
+subject model**, on CPU.
+
+The `correct` boolean is what makes it decisive. SoT's C2/C3 claim is that perspective
+diversity *accounts for* the accuracy advantage. With correctness labels we can test the
+within-model version directly:
+
+> Among traces from a single model on a single task, is HSE diversity higher in the traces
+> that reach the right answer?
+
+If diversity does not separate correct from incorrect traces at n = 5M, the mediation claim
+has no room left to hide in sample noise. If it does, the claim gains its strongest support
+yet — and either way it is an answer, obtained judge-free, for the price of embeddings.
+
+⚠ Caveat: NuminaMath is **math-only**, whereas SoT's pool spans BBH/GPQA/MATH/MMLU-Pro/MUSR.
+This tests the claim within a domain, not across the paper's mix.
+
 ## 4. Also tracking (not yet read first-hand)
 
 > ⚠ Everything in this section is from search snippets only. Read before citing.
