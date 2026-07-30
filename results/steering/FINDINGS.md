@@ -1,4 +1,18 @@
 # The society-of-thought steering effect is a Countdown artifact
+> ⚠ **CORRECTION 2026-07-30 — read `RECHECK_length_and_filtering.md` before this file.**
+> The "redundant society" result reported below is **retracted**. It came from dropping
+> traces with too few segments to score; because steering *creates* perspective shifts,
+> that discarded 47.5% of the baseline condition versus 4% at the top dose. Scoring
+> single-voice traces as zero (the paper's own convention) reverses the trend: normalised
+> diversity **rises** with steering, 0.124 → 0.182, and survives length matching.
+>
+> What this changes: the society is real and genuinely more differentiated, not an echo
+> chamber. What it does not change, and in fact sharpens: diversity and accuracy are
+> **decoupled**. Diversity rises monotonically with dose while accuracy peaks at α=1.0
+> (34%) and collapses at α=1.693 (3.5% vs 24% baseline). Maximum diversity coincides with
+> near-total failure — a cleaner refutation of the mediation claim than redundancy was,
+> because it requires no claim that the society is fake.
+
 
 A test of the mechanistic claim in **"Reasoning Models Generate Societies of Thought"**
 (Kim, Lai, Scherrer, Agüera y Arcas & Evans, [arXiv:2601.10825](https://arxiv.org/abs/2601.10825)).

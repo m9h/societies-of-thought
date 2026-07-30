@@ -7,7 +7,7 @@
 ## Why this note exists
 
 Our results read as a set of isolated nulls — the steering effect doesn't generalize,
-the induced society is redundant, the dialogue priming advantage is transient. Framed
+the dialogue priming advantage is transient, diversity does not predict correctness. Framed
 that way they are easy to dismiss as a failed replication.
 
 They are not isolated. A parallel literature on **multi-agent debate (MAD)** has, in the
@@ -39,7 +39,16 @@ theorem's assumptions are shown to hold for segments within one trace -- see S5.
 
 ---
 
-## 1. The martingale result — the theory behind our redundancy finding
+> ⚠ **CORRECTION 2026-07-30.** This section was built on our finding that the induced
+> society is *redundant*. **That finding is retracted** — it was a filtering artifact, and
+> corrected analysis shows steering makes the society genuinely MORE diverse
+> (`results/steering/RECHECK_length_and_filtering.md`). The martingale connection was
+> already flagged below as an analogy rather than a derivation; it has now also lost its
+> main empirical anchor. Measured segment diversity is not inter-agent error correlation,
+> and we have never measured the latter. Treat everything in §1 as motivation only until
+> that measurement exists.
+
+## 1. The martingale result — ⚠ its empirical anchor has been withdrawn
 
 **[Diverse Evidence, Better Forecasts: Multi-Agent Deliberation Under Information
 Asymmetry](https://arxiv.org/abs/2607.01661)** — CMU, arXiv 2607.01661v1, 2 July 2026.
@@ -73,7 +82,7 @@ most of the benefit is the diversity, not the conversation.
 Our judge-free HSE analysis (`analysis/hse.py`, FINDINGS §7) found that steering the
 SoT "conversational surprise" feature produces **more voices but LOWER normalised
 diversity** — segments become more alike, not more different — while accuracy falls. We
-called that a *redundant society*.
+called that a *redundant society* — **now retracted, see the correction above**.
 
 If the theorem transfers, it is the formal statement of why a redundant society **cannot**
 help: zero information asymmetry ⇒ error correlation 1.0 ⇒ expected accuracy flat under
@@ -322,8 +331,9 @@ The one-paragraph version:
 > recent MAD theory, where debate among agents with identical information is a martingale
 > whose expected accuracy cannot improve. We test that requirement directly. Using a
 > judge-free diversity instrument (Balch's Hierarchic Social Entropy) we find the induced
-> society is *redundant*: steering produces more voices but lower normalised diversity,
-> and accuracy falls rather than rises. In genuine PPO training we find no dialogic
+> society is genuinely more differentiated at every dose — normalised diversity rises
+> monotonically with steering — and accuracy still collapses, so diversity and accuracy are
+> decoupled rather than linked. In genuine PPO training we find no dialogic
 > society emerges at all — conversational markers *decline* 20% while systematic search
 > intensifies. And in a faithful three-arm replication of the paper's own scaffolding
 > experiment, the dialogue-priming advantage is transient: monologue priming catches up

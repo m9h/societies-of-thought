@@ -142,20 +142,33 @@ needs no judge: segment a trace at the paper's own perspective-shift cues, embed
 segments, integrate the diversity from the clustering dendrogram. We ran it on 1,200
 steered Countdown traces:
 
-| α | segments/trace | normalised diversity | accuracy |
-|---|---|---|---|
-| 0 | 21.4 | **0.236** | 15.2% |
-| 1.0 | 44.6 | 0.190 | 31.5% |
-| 1.693 | 54.7 | **0.190** | 3.6% |
+| α | single-voice dropped | segments/trace | normalised diversity | accuracy |
+|---|---|---|---|---|
+| 0 | **95 / 200** | 12.0 | **0.124** | 24.0% |
+| 1.0 | 32 / 200 | 37.7 | 0.159 | **34.0%** |
+| 1.693 | 8 / 200 | 52.6 | **0.182** | **3.5%** |
 
-**Steering makes the society bigger and proportionally *more redundant*.** Segment count
-more than doubles; normalised diversity *falls 20%*. The paper's own metaphor — a diverse
-society of voices — is measurably backwards under its own intervention.
+> ⚠ **CORRECTED 2026-07-30.** An earlier version of this table reported diversity
+> *falling* with steering (0.236 → 0.190) and concluded the induced society is
+> **redundant** — "a louder crowd saying more of the same thing". That was an artifact:
+> traces with too few segments to score were dropped, and since steering *creates*
+> perspective shifts, 47.5% of the baseline condition was discarded versus 4% at the top
+> dose. Scoring single-voice traces as zero, which is the paper's own convention, reverses
+> the trend. The echo-chamber metaphor is withdrawn. Full audit:
+> `results/steering/RECHECK_length_and_filtering.md`.
 
-> **Better metaphor.** Not a council of distinct voices deliberating toward an answer.
-> Steering harder produces **a louder crowd saying more of the same thing** — an echo
-> chamber, not a debate. "Society of thought" implies differentiation the diversity
-> measure shows evaporating exactly as you push the knob.
+**Steering makes the society bigger *and genuinely more differentiated*** — and it still
+does not buy reasoning. Normalised diversity rises monotonically with dose while accuracy
+traces an inverted U. At α=1.693 the society is at its **most diverse** and the model at its
+**least accurate**: 3.5% against a 24% baseline. The effect survives matching steered and
+baseline traces on length (α=1.0: −0.052, 95% CI [−0.079, −0.026]), so it is not a
+by-product of longer traces.
+
+> **Better metaphor.** Not an echo chamber — the voices really do diverge. But a council
+> that deliberates more widely and decides worse. Diversity and accuracy are **decoupled**:
+> you can drive genuine perspective diversity up and reasoning down at the same time. That
+> is a sharper problem for the paper than redundancy would have been, because it needs no
+> claim that the society is fake.
 
 ### Instrument 2 — the Jacobian lens (locating the feature in the workspace)
 
@@ -168,8 +181,8 @@ vs 0.728). The knob is genuinely wired into the machine.
 That reframes the whole steering result. The feature is not off-workspace dialogic garnish;
 it is a real workspace direction, and steering **over-drives** it. Combined with the HSE
 collapse and the inverted-U, the mechanism is not "add voices, get reasoning" — it is
-"saturate one real channel until the workspace's diversity collapses into redundancy and
-then noise."
+"saturate one real channel until the trace fills with genuinely divergent voices that no
+longer converge on an answer."
 
 > **Better metaphor.** Cranking a real knob until the signal clips — not adding
 > instruments to an orchestra. The feature is load-bearing, which is *why* over-driving it
