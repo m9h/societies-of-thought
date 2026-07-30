@@ -385,3 +385,31 @@ def test_bare_paper_prompt_is_not_scorable_and_is_not_the_default():
     bare = make_paper_prompt([79, 17, 60], 36)
     assert "Assistant:" not in bare and "<|im_start|>assistant" not in bare
     assert inspect.signature(rewrite_ppo_prompt).parameters["bare"].default is False
+
+
+# --- markdown-wrapped answers (found in real QwQ output, 5th instance of this bug class) --
+
+
+@pytest.mark.parametrize("pred,gold", [
+    ("**Answer:** (F) brown", "(F)"),
+    ("**Answer:** (D) three", "(D)"),
+    ("**Answer:** (A) Alex could not meet.", "(A)"),
+    ("**Answer**: (E) Vincent", "(E)"),
+    ("__Answer:__ (B)", "(B)"),
+    ("- **(C)**", "(C)"),
+    ("`C`", "C"),
+    ("**Final Answer:** \\boxed{D}", "(D)"),
+])
+def test_grader_handles_markdown_wrapped_answers(pred, gold):
+    """These are VERBATIM strings from QwQ-32B output. Before the fix every one scored
+    wrong, dragging measured BBH accuracy to an implausible 13.8%."""
+    from rl.pool_build import is_correct
+
+    assert is_correct(pred, gold) is True
+
+
+def test_markdown_stripping_does_not_create_false_positives():
+    from rl.pool_build import is_correct
+
+    assert is_correct("**Answer:** (B) brown", "(F)") is False
+    assert is_correct("**(A) Modifiers or Adjectives**", "(F)") is False

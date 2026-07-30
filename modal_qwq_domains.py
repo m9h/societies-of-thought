@@ -45,7 +45,16 @@ MODEL = "Qwen/QwQ-32B"          # the paper's own subject model
 GPU = "A100-80GB:2"
 
 # Reasoning traces are long; QwQ in particular thinks at length before answering.
-MAX_TOKENS = 4096
+#
+# TRUNCATION IS NOT A NEUTRAL LOSS. A trace cut off at the token cap never reaches an
+# answer, so it is graded incorrect -- which manufactures a class of traces that are
+# simultaneously MAXIMUM length and ALWAYS wrong. In a correct-vs-incorrect diversity
+# comparison that is the confound in its purest form. At 4096 tokens, QwQ hit the cap on
+# most GPQA problems and measured accuracy fell to 16%, below the 25% chance floor.
+#
+# So: a generous cap, AND every record carries vLLM's finish_reason so truncated traces
+# can be excluded downstream rather than silently scored as failures.
+MAX_TOKENS = 16384
 
 
 @app.function(image=image, gpu=GPU, volumes={"/cache": cache, "/out": out},
@@ -71,14 +80,15 @@ def generate_shard(shard: int, n_shards: int, attempt: int, seed: int = 0) -> di
     from vllm import LLM, SamplingParams
 
     llm = LLM(model=MODEL, tensor_parallel_size=2, dtype="bfloat16", seed=seed,
-              gpu_memory_utilization=0.90, max_model_len=8192)
+              gpu_memory_utilization=0.90, max_model_len=20480)
     tok = llm.get_tokenizer()
     sp = SamplingParams(temperature=0.6, top_p=0.95, max_tokens=MAX_TOKENS, seed=seed)
 
     prompts = [tok.apply_chat_template(
         [{"role": "user", "content": p["task"]}], tokenize=False,
         add_generation_prompt=True) for p in problems]
-    outs = [o.outputs[0].text for o in llm.generate(prompts, sp)]
+    gen = llm.generate(prompts, sp)
+    outs = [(o.outputs[0].text, o.outputs[0].finish_reason) for o in gen]
 
     _BOX = re.compile(r"\\boxed\{([^{}]*)\}")
 
@@ -90,20 +100,24 @@ def generate_shard(shard: int, n_shards: int, attempt: int, seed: int = 0) -> di
         tail = [ln.strip() for ln in text.strip().splitlines() if ln.strip()]
         return tail[-1] if tail else ""
 
-    recs, n_ok = [], 0
-    for p, o in zip(problems, outs):
+    recs, n_ok, n_trunc = [], 0, 0
+    for p, (o, finish) in zip(problems, outs):
+        truncated = (finish == "length")
+        n_trunc += truncated
         ans = final_answer(o)
         ok = bool(is_correct(ans, p["answer"], p.get("options") or None))
         n_ok += ok
         recs.append({"pid": p["pid"], "source": p["source"], "subtask": p["subtask"],
                      "answer": p["answer"], "extracted": ans[:200],
-                     "correct": ok, "response": o.strip()})
+                     "correct": ok, "truncated": truncated, "finish_reason": finish,
+                     "response": o.strip()})
 
     Path(f"/out/qwqdom_{shard:03d}.json").write_text(json.dumps(recs))
     out.commit()
     print(f"shard {shard}: {len(recs)} traces, {n_ok} correct "
-          f"({100*n_ok/max(len(recs),1):.1f}%)", flush=True)
-    return {"shard": shard, "n": len(recs), "n_correct": n_ok}
+          f"({100*n_ok/max(len(recs),1):.1f}%), {n_trunc} truncated "
+          f"({100*n_trunc/max(len(recs),1):.1f}%)", flush=True)
+    return {"shard": shard, "n": len(recs), "n_correct": n_ok, "n_truncated": n_trunc}
 
 
 @app.function(image=image, volumes={"/out": out}, timeout=30 * 60, env=ENV)
@@ -127,8 +141,18 @@ def assemble() -> dict:
     acc = {s: round(sum(r["correct"] for r in uniq if r["source"] == s)
                     / max(sum(1 for r in uniq if r["source"] == s), 1), 3)
            for s in by_src}
+    trunc = Counter(r["source"] for r in uniq if r.get("truncated"))
+    # Accuracy among traces that actually FINISHED -- the only honest number, since a
+    # truncated trace was never given the chance to be right.
+    fin = [r for r in uniq if not r.get("truncated")]
+    acc_fin = {s: round(sum(r["correct"] for r in fin if r["source"] == s)
+                        / max(sum(1 for r in fin if r["source"] == s), 1), 3)
+               for s in by_src}
     return {"n": len(uniq), "n_correct": sum(r["correct"] for r in uniq),
-            "by_source": dict(by_src), "accuracy_by_source": acc}
+            "n_truncated": sum(1 for r in uniq if r.get("truncated")),
+            "by_source": dict(by_src), "accuracy_by_source": acc,
+            "truncated_by_source": dict(trunc),
+            "accuracy_finished_only": acc_fin, "n_finished": len(fin)}
 
 
 @app.local_entrypoint()
@@ -137,5 +161,7 @@ def main(attempt: int = 4000, shards: int = 4, seed: int = 0):
         [(i, shards, attempt, seed) for i in range(shards)]))
     tot = sum(r["n"] for r in results)
     ok = sum(r["n_correct"] for r in results)
-    print(f"generated {tot} traces, {ok} correct ({100*ok/max(tot,1):.1f}%)")
+    tr = sum(r.get("n_truncated", 0) for r in results)
+    print(f"generated {tot} traces, {ok} correct ({100*ok/max(tot,1):.1f}%), "
+          f"{tr} truncated ({100*tr/max(tot,1):.1f}%)")
     print(assemble.remote())

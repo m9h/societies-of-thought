@@ -204,6 +204,22 @@ _NORM = re.compile(r"[\s$\\,]+")
 _PROSE = re.compile(
     r"^(so\s+)?(the\s+)?(final\s+|correct\s+)?(answer|solution|option|choice)"
     r"\s*(is|:|=)?\s*", re.I)
+# Markdown emphasis around the answer defeats every prefix rule that assumes the string
+# starts with a word or a bracket. QwQ writes "**Answer:** (F) brown" and "**Answer**: (E)
+# Vincent"; without stripping these, a correct answer scores wrong. Found by inspecting
+# QwQ output when BBH accuracy came out at an implausible 13.8%.
+_EMPH = re.compile(r"[*_`]+")
+
+
+def _demark(a: str) -> str:
+    """Remove markdown emphasis and leading bullet/space noise, repeatedly."""
+    prev = None
+    while prev != a:
+        prev = a
+        a = _EMPH.sub("", a).strip()
+        a = re.sub(r"^[\s>\-•]+", "", a)
+        a = _PROSE.sub("", a).strip()
+    return a
 
 
 def _unbox(a: str) -> str:
@@ -226,9 +242,9 @@ def _unbox(a: str) -> str:
 
 
 def normalise_answer(a: str) -> str:
-    a = (a or "").strip()
-    a = _PROSE.sub("", a).strip()
+    a = _demark((a or "").strip())
     a = _unbox(a).strip()
+    a = _demark(a)
     a = re.sub(r"^\(([A-P])\)$", r"\1", a, flags=re.I)
     a = re.sub(r"^\\text\{(.*)\}$", r"\1", a)
     return _NORM.sub("", a).lower().rstrip(".")
@@ -237,8 +253,10 @@ def normalise_answer(a: str) -> str:
 def _letter(a: str) -> str | None:
     """Leading choice letter, however the model dressed it up: 'C', '(C)', 'C.',
     'C) 10^-4 eV', 'C: foo'."""
-    a = _unbox(_PROSE.sub("", (a or "").strip()).strip()).strip()
-    m = re.match(r"^\(?([A-Pa-p])\)?\s*(?:[.):\-]|$)", a)
+    a = _demark(_unbox(_demark((a or "").strip())).strip())
+    # "(F) brown", "F. three", "A: Alex could not meet." -- the letter leads, then a
+    # separator, then optional restatement of the option text.
+    m = re.match(r"^\(?([A-Pa-p])\)?\s*(?:[.):\-]|\s|$)", a)
     return m.group(1).upper() if m else None
 
 
