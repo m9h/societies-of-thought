@@ -1,9 +1,9 @@
-# Within QwQ, perspective diversity does not predict correctness
+# Within QwQ, perspective diversity carries no independent signal about correctness
 
-*Judge-free test of SoT's mediation claim on 10,000 QwQ traces. Code:
-`analysis/hse_qwq.py`, cross-run comparison in `analysis/hse_qwq_compare.py`. Canonical
-data: `hse_shuffled_minilm.json`; `hse_qwq.json` is retained as the cautionary
-drop-handling comparison.*
+*Judge-free test of SoT's mediation claim on 10,000 QwQ traces. Code: `analysis/hse_qwq.py`
+(measurement), `analysis/hse_qwq_length.py` (length control), `analysis/hse_qwq_compare.py`
+(cross-run stability). Canonical data: `hse_shuffled_minilm.json`,
+`hse_length_matched.json`.*
 
 ## The claim
 
@@ -12,12 +12,10 @@ a *diverse* internal society, and that this diversity **accounts for** the accur
 advantage. Diversity is measured by an LLM judge that infers personas and scores their
 spread, over 8,262 traces.
 
-The cross-model version of that comparison cannot isolate diversity: DeepSeek-R1 differs
-from DeepSeek-V3 in many ways at once, so "the reasoning model is both more diverse and
-more accurate" is compatible with diversity being incidental. The **within-model** version
-is decidable. Hold the model, the decoding, and the task distribution fixed; vary only the
-outcome. If diversity mediates accuracy, correct traces must be more diverse than
-incorrect ones.
+The cross-model comparison cannot isolate diversity: DeepSeek-R1 differs from DeepSeek-V3
+in many ways at once. The **within-model** version is decidable. Hold the model, the
+decoding, and the task distribution fixed; vary only the outcome. If diversity mediates
+accuracy, correct traces must be more diverse than incorrect ones.
 
 `PrimeIntellect/NuminaMath-QwQ-CoT-5M` (MIT) makes this cheap: 5,138,102 **QwQ** traces
 with a per-trace `correct` label. QwQ-32B is one of the two models SoT builds its
@@ -25,131 +23,104 @@ descriptive and diversity claims on.
 
 ## Result
 
-Canonical run: n = 5,000 correct and 5,000 incorrect, shuffled sample, nothing discarded.
-Instrument reused unchanged from
-`analysis/hse.py` (segmentation at the paper's own perspective-shift cues, then Balch's
-Hierarchic Social Entropy).
+**At matched trace length, diversity does not differ between correct and incorrect traces.**
 
-| metric | correct | incorrect | difference (95% CI) |
-|---|---|---|---|
-| **hse_norm** (diversity, count-normalised) | 0.2746 | 0.2932 | **−0.0186** [−0.0237, −0.0135] ✱ |
-| mean pairwise distance | 0.3826 | 0.4819 | **−0.0992** [−0.1065, −0.0920] ✱ |
-| hse (raw) | 0.8127 | 1.1985 | **−0.3858** [−0.4060, −0.3656] ✱ |
-| segments per trace | 10.9 | 30.2 | −19.3 ✱ |
-| words per trace | 924 | 2,100 | −1,176 ✱ |
-
-✱ = 95% CI on the difference excludes zero.
-
-**Every diversity measure is *lower* in the traces that reach the correct answer.** The
-mediation claim requires the opposite sign.
-
-The mechanism is legible in the last two rows. When QwQ gets a problem wrong it flails:
-2.8× more perspective shifts, 2.3× more words. Shift markers — *wait*, *but*, *actually*,
-*however* — track **struggle**, not success. On this evidence the "society" is denser
-precisely where the reasoning fails.
-
-That is the same conclusion our steering experiment reached by intervention rather than
-observation: pushing the conversational feature up made traces measurably more dialogic and
-accuracy *fell* (`results/steering/FINDINGS.md`). Two independent methods, one direction.
-
-### Effect sizes, stated honestly
-
-`hse_norm` differs by −0.0186 against a base of ~0.29 — about **6% relative**. That is a
-small effect, precisely estimated. The large differences (`hse` −0.40, `mean_dist` −0.10)
-are substantially **length artifacts**: more segments mechanically raise raw entropy and
-pairwise spread. `hse_norm` divides out log2(N) and is the measure to quote. So the
-defensible statement is *diversity does not predict correctness in the direction the claim
-requires, and if anything anti-predicts it*, not *diversity strongly causes failure*.
-
-## The methodological point that decides the sign
-
-Our first run **inverted this result**, and the cause is worth recording because it is a
-one-line decision.
-
-Traces with fewer than 3 perspective shifts cannot support a dendrogram. Our first pass
-**dropped** them. But QwQ's correct traces have far fewer shifts, so dropping removed
-**314 correct vs 143 incorrect** traces — 2.2× more from the group with less diversity,
-i.e. it deleted the low-diversity tail of the correct group specifically.
-
-| single-voice traces | hse_norm difference | reads as |
+| estimate of hse_norm difference (correct − incorrect) | value | shrinkage |
 |---|---|---|
-| **dropped** | **+0.0134** [+0.0075, +0.0193] ✱ | correct traces MORE diverse |
-| **scored 0** | **−0.0149** [−0.0230, −0.0068] ✱ | correct traces LESS diverse |
+| unadjusted, whole sample (n = 10,000) | −0.0186 [−0.0237, −0.0135] ✱ | — |
+| stratified on length, 8 quantile bins | −0.0041 [−0.0085, +0.0002] | 78% |
+| **1:1 length-matched, ±2% caliper (3,010 pairs)** | **−0.0003 [−0.0066, +0.0060]** | **99%** |
 
-Same data, same instrument, opposite conclusions, both with CIs excluding zero.
+✱ = 95% CI excludes zero. Matched pairs averaged 1,195 vs 1,205 words — balanced to 1%.
 
-**The paper settles which is right.** Its own diversity metric assigns zero, not exclusion:
+The unadjusted numbers are large and consistent, and they are **length**:
 
-> If a reasoning trace contained only a single implicit voice, **P_j = 0**
+| | correct | incorrect | ratio |
+|---|---|---|---|
+| words per trace | 924 | 2,100 | **2.3×** |
+| segments per trace | 10.9 | 30.2 | **2.8×** |
+| hse (raw) | 0.8127 | 1.1985 | — |
+| mean pairwise distance | 0.3826 | 0.4819 | — |
+| hse_norm | 0.2746 | 0.2932 | — |
+
+When QwQ gets a problem wrong it flails: 2.3× the words, 2.8× the perspective shifts. Every
+diversity measure follows length, and once length is held fixed **nothing is left**.
+
+## What this does and does not say about the paper
+
+**It is a null against the mediation claim.** SoT's C2/C3 require diversity to explain
+accuracy. Within a single reasoning model, on a single domain, at matched trace length,
+diversity has no association with correctness in either direction. Whatever separates a
+correct QwQ trace from an incorrect one, it is not how many differentiated voices it
+contains.
+
+**It also retracts a result we briefly believed.** An earlier version of this file reported
+that correct traces are *less* diverse (−0.0186, CI excluding zero, stable across sampling
+and embedders). That is superseded: it was length, not diversity. We do **not** claim the
+society is actively harmful.
+
+**It leaves the descriptive observation intact.** QwQ traces are dialogic, and perspective
+shifts track **struggle** — they are dense where the model is failing. That is consistent
+with the account in `results/steering/FINDINGS.md` (dialogic markers as the exhaust of a
+search process rather than its engine), but that interpretation now rests on the *steering*
+result, where intervention raised dialogic behaviour and accuracy fell. This comparison is
+a null and cannot carry it.
+
+## Three conclusions from one dataset — read this before trusting any of them
+
+This analysis reached three different answers. The sequence is the most useful thing in this
+file.
+
+| # | method | hse_norm difference | reads as |
+|---|---|---|---|
+| 1 | single-voice traces **dropped** | **+0.0134** [+0.0075, +0.0193] ✱ | correct MORE diverse |
+| 2 | single-voice traces **scored 0** | **−0.0186** [−0.0237, −0.0135] ✱ | correct LESS diverse |
+| 3 | **length-matched** | **−0.0003** [−0.0066, +0.0060] | **no difference** |
+
+Both (1) and (2) had confidence intervals excluding zero. Both were artifacts.
+
+**(1) was a filtering error.** Traces with fewer than 3 shifts cannot support a dendrogram,
+so we dropped them — removing 707 correct vs 365 incorrect, i.e. deleting the low-diversity
+tail of the correct group specifically. The paper's own convention settles it:
+
 > If a reasoning trace contained only a single implicit voice, **E = 0**
 
-A trace with one voice has no diversity — that is a measurement, not a missing value.
-Scoring zero is the paper's convention and is now the default (`--degenerate zero`), with
-tests pinning it and the `drop` path documented as the trap it is.
+A single voice is zero diversity: a measurement, not a missing value.
 
-Had we not checked, we would have published a result in the paper's favour, produced by our
-own filter.
+**(2) was a length confound.** `hse_norm` divides out segment *count* via log2(N), which is
+not the same as controlling for length. Matching on words removed 99% of the effect.
 
-## Robustness — the three checks the first version owed
-
-All three follow-ups listed in the first version have now been run. Every arbitrary
-choice was varied and the sign did not move.
-
-| run | embedder | sampling | n/class | **hse_norm difference** |
-|---|---|---|---|---|
-| *(the trap)* single-voice **dropped** | MiniLM-L6 | prefix | 2,000 | **+0.0134** [+0.0075, +0.0193] |
-| single-voice **zero** | MiniLM-L6 | prefix | 2,000 | **−0.0149** [−0.0230, −0.0068] |
-| single-voice zero | MiniLM-L6 | **shuffled** (100k) | **5,000** | **−0.0186** [−0.0237, −0.0135] |
-| single-voice zero | **mpnet-base** | shuffled (100k) | 2,000 | **−0.0214** [−0.0289, −0.0139] |
-
-`analysis/hse_qwq_compare.py` judges sign stability across runs and reports:
-**SIGN STABLE across 3 paper-convention runs — correct traces LESS diverse**, on all three
-of `hse_norm`, `mean_dist` and `hse`.
-
-Three specifics worth noting:
-
-1. **The prefix concern is closed.** A seeded 100k reservoir over the stream, at 2.5× the
-   sample size, moved `hse_norm` from −0.0149 to −0.0186 — same direction, slightly
-   larger. `mean_dist` is essentially unchanged across sampling (−0.0991 → −0.0992).
-2. **It is not an artifact of a weak embedder.** `all-mpnet-base-v2` gives a *larger*
-   effect than `all-MiniLM-L6-v2` (−0.0214 vs −0.0186), so the finding does not depend on
-   the cheaper model's limitations.
-3. **Only one choice ever flipped the sign**: dropping single-voice traces instead of
-   scoring them zero. Sampling and embedder did not. That isolates the earlier inversion
-   as a filtering error, not measurement noise.
-
-Canonical run: `hse_shuffled_minilm.json` (n = 5,000/class, shuffled, zero convention).
-Its single-voice counts are 707 correct vs 365 incorrect — the same 2:1 asymmetry that
-made the drop-handling error so consequential.
+**What the robustness checks did and did not catch.** We varied the sampling (streamed
+prefix → seeded 100k shuffle), the sample size (2,000 → 5,000 per class), and the embedder
+(MiniLM-L6 → mpnet-base). The sign was stable across all of them — `hse_qwq_compare.py`
+reported *"SIGN STABLE across 3 paper-convention runs"*. **That stability told us nothing
+about the confound**, because none of those choices touched length. Reproducibility is not
+validity, and three consistent runs of a confounded estimator are still confounded.
 
 ## Limits
 
-- ~~Streamed prefix~~ — **resolved.** A seeded 100k shuffle reservoir is now the default
-  and does not change the direction.
-- **Math only.** NuminaMath, whereas SoT's pool spans BBH/GPQA/MATH/MMLU-Pro/MUSR. This
-  tests the claim within one domain.
+- **Math only.** NuminaMath, whereas SoT's pool spans BBH/GPQA/MATH/MMLU-Pro/MUSR.
 - **Segmentation is a heuristic** — a regex over the paper's cue words, not a semantic
-  parse. It is the same heuristic used in our steering analysis, so the two are
-  comparable, but it is not the paper's LLM judge and does not claim to be.
-- ~~One embedding model~~ — **resolved.** Replicated with `all-mpnet-base-v2`, larger effect.
-- **Correlational, and length is the live confound.** Incorrect traces are 2.3× longer.
-  `hse_norm` divides out segment *count*, but not everything length brings with it. The
-  matched-length subsample (Next §6) is the check that would close this.
-- **Not the paper's instrument.** If the authors' judge-based measure disagrees with HSE on
-  the same traces, that is a finding about the measures. Running both on this corpus would
-  settle it and has not been done.
+  parse. Same heuristic as our steering analysis, so the two are comparable, but it is not
+  the paper's LLM judge.
+- **Not the paper's instrument.** HSE has never been compared against the authors' judge on
+  shared inputs. Our null is a null *for HSE*; if the two measures disagree, that is a
+  finding about the measures and it is the most informative thing left to do.
+- **Matching cannot reach exactly zero bias.** Residual imbalance inside the ±2% caliper is
+  real; read the 99% shrinkage rather than the nominal p-value. A purely length-driven
+  effect shrinks by most of its size, which is what happened here.
+- **A null is not proof of absence.** With 3,010 matched pairs the CI is [−0.0066, +0.0060],
+  so effects below ~0.007 in hse_norm (≈2% relative) remain possible.
+- **Correlational throughout.**
 
 ## Next
 
-1. ~~Shuffle-buffer resample~~ — **done**, sign unchanged.
-2. ~~Embedder robustness~~ — **done**, effect larger with mpnet.
-3. ~~Scale up~~ — **done** at 5,000/class.
-4. **Run the paper's own judge-based measure on these same traces.** If an LLM judge
-   disagrees with HSE here, that is a finding about the instruments and the most
-   informative thing left. Our result is only as strong as the claim that HSE measures
-   what their judge measures, and that has never been checked on shared inputs.
-5. **The same test on DeepSeek-R1 traces**, the paper's other subject model, if an
-   openly-licensed corpus with correctness labels exists.
-6. **Length-matched subsample.** Compare correct and incorrect traces at matched word
-   count. It will shrink the sample hard, but it separates "diversity anti-predicts
-   correctness" from "long traces are both more diverse and more often wrong".
+1. **Apply this length control to our steering results.** Steering changed dialogic markers
+   *and* trace length. If that result is also length-mediated, the interpretation in
+   `results/steering/FINDINGS.md` needs the same correction this file just took — and it is
+   currently load-bearing for the whole project. This is now the highest priority in the
+   repository, ahead of any new experiment.
+2. **Run the paper's judge-based measure on these same traces**, with the same length
+   control, to test whether the null is about diversity or about HSE.
+3. **DeepSeek-R1 traces**, the paper's other subject model, if an openly-licensed corpus
+   with correctness labels exists.
