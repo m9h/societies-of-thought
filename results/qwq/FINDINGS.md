@@ -1,8 +1,9 @@
 # Within QwQ, perspective diversity does not predict correctness
 
-*Judge-free test of SoT's mediation claim on 4,000 QwQ traces. Code:
-`analysis/hse_qwq.py`. Data: `hse_qwq_paper_convention.json` (canonical) and
-`hse_qwq.json` (the drop-handling run, kept as the cautionary comparison).*
+*Judge-free test of SoT's mediation claim on 10,000 QwQ traces. Code:
+`analysis/hse_qwq.py`, cross-run comparison in `analysis/hse_qwq_compare.py`. Canonical
+data: `hse_shuffled_minilm.json`; `hse_qwq.json` is retained as the cautionary
+drop-handling comparison.*
 
 ## The claim
 
@@ -24,17 +25,18 @@ descriptive and diversity claims on.
 
 ## Result
 
-n = 2,000 correct and 2,000 incorrect, nothing discarded. Instrument reused unchanged from
+Canonical run: n = 5,000 correct and 5,000 incorrect, shuffled sample, nothing discarded.
+Instrument reused unchanged from
 `analysis/hse.py` (segmentation at the paper's own perspective-shift cues, then Balch's
 Hierarchic Social Entropy).
 
 | metric | correct | incorrect | difference (95% CI) |
 |---|---|---|---|
-| **hse_norm** (diversity, count-normalised) | 0.2698 | 0.2847 | **−0.0149** [−0.0230, −0.0068] ✱ |
-| mean pairwise distance | 0.3810 | 0.4801 | **−0.0991** [−0.1109, −0.0873] ✱ |
-| hse (raw) | 0.8178 | 1.2155 | **−0.3977** [−0.4308, −0.3646] ✱ |
-| segments per trace | 13.5 | 38.2 | −24.7 ✱ |
-| words per trace | 1,065 | 2,489 | −1,424 ✱ |
+| **hse_norm** (diversity, count-normalised) | 0.2746 | 0.2932 | **−0.0186** [−0.0237, −0.0135] ✱ |
+| mean pairwise distance | 0.3826 | 0.4819 | **−0.0992** [−0.1065, −0.0920] ✱ |
+| hse (raw) | 0.8127 | 1.1985 | **−0.3858** [−0.4060, −0.3656] ✱ |
+| segments per trace | 10.9 | 30.2 | −19.3 ✱ |
+| words per trace | 924 | 2,100 | −1,176 ✱ |
 
 ✱ = 95% CI on the difference excludes zero.
 
@@ -52,7 +54,7 @@ accuracy *fell* (`results/steering/FINDINGS.md`). Two independent methods, one d
 
 ### Effect sizes, stated honestly
 
-`hse_norm` differs by −0.0149 against a base of ~0.28 — about **5% relative**. That is a
+`hse_norm` differs by −0.0186 against a base of ~0.29 — about **6% relative**. That is a
 small effect, precisely estimated. The large differences (`hse` −0.40, `mean_dist` −0.10)
 are substantially **length artifacts**: more segments mechanically raise raw entropy and
 pairwise spread. `hse_norm` divides out log2(N) and is the measure to quote. So the
@@ -88,30 +90,66 @@ tests pinning it and the `drop` path documented as the trap it is.
 Had we not checked, we would have published a result in the paper's favour, produced by our
 own filter.
 
+## Robustness — the three checks the first version owed
+
+All three follow-ups listed in the first version have now been run. Every arbitrary
+choice was varied and the sign did not move.
+
+| run | embedder | sampling | n/class | **hse_norm difference** |
+|---|---|---|---|---|
+| *(the trap)* single-voice **dropped** | MiniLM-L6 | prefix | 2,000 | **+0.0134** [+0.0075, +0.0193] |
+| single-voice **zero** | MiniLM-L6 | prefix | 2,000 | **−0.0149** [−0.0230, −0.0068] |
+| single-voice zero | MiniLM-L6 | **shuffled** (100k) | **5,000** | **−0.0186** [−0.0237, −0.0135] |
+| single-voice zero | **mpnet-base** | shuffled (100k) | 2,000 | **−0.0214** [−0.0289, −0.0139] |
+
+`analysis/hse_qwq_compare.py` judges sign stability across runs and reports:
+**SIGN STABLE across 3 paper-convention runs — correct traces LESS diverse**, on all three
+of `hse_norm`, `mean_dist` and `hse`.
+
+Three specifics worth noting:
+
+1. **The prefix concern is closed.** A seeded 100k reservoir over the stream, at 2.5× the
+   sample size, moved `hse_norm` from −0.0149 to −0.0186 — same direction, slightly
+   larger. `mean_dist` is essentially unchanged across sampling (−0.0991 → −0.0992).
+2. **It is not an artifact of a weak embedder.** `all-mpnet-base-v2` gives a *larger*
+   effect than `all-MiniLM-L6-v2` (−0.0214 vs −0.0186), so the finding does not depend on
+   the cheaper model's limitations.
+3. **Only one choice ever flipped the sign**: dropping single-voice traces instead of
+   scoring them zero. Sampling and embedder did not. That isolates the earlier inversion
+   as a filtering error, not measurement noise.
+
+Canonical run: `hse_shuffled_minilm.json` (n = 5,000/class, shuffled, zero convention).
+Its single-voice counts are 707 correct vs 365 incorrect — the same 2:1 asymmetry that
+made the drop-handling error so consequential.
+
 ## Limits
 
-- **Streamed prefix, not a random sample.** `load_balanced` takes the first matching rows
-  from the stream. If the corpus is ordered (by problem, difficulty, or generation batch),
-  our 4,000 traces are a prefix rather than a random draw from 5.1M. This is the largest
-  open weakness; a shuffle buffer would fix it and should be run before publication.
+- ~~Streamed prefix~~ — **resolved.** A seeded 100k shuffle reservoir is now the default
+  and does not change the direction.
 - **Math only.** NuminaMath, whereas SoT's pool spans BBH/GPQA/MATH/MMLU-Pro/MUSR. This
   tests the claim within one domain.
 - **Segmentation is a heuristic** — a regex over the paper's cue words, not a semantic
   parse. It is the same heuristic used in our steering analysis, so the two are
   comparable, but it is not the paper's LLM judge and does not claim to be.
-- **One embedding model** (`all-MiniLM-L6-v2`). Robustness to the embedder is unchecked.
-- **Correlational.** This shows diversity does not track correctness within a model; it
-  does not establish what does.
+- ~~One embedding model~~ — **resolved.** Replicated with `all-mpnet-base-v2`, larger effect.
+- **Correlational, and length is the live confound.** Incorrect traces are 2.3× longer.
+  `hse_norm` divides out segment *count*, but not everything length brings with it. The
+  matched-length subsample (Next §6) is the check that would close this.
 - **Not the paper's instrument.** If the authors' judge-based measure disagrees with HSE on
   the same traces, that is a finding about the measures. Running both on this corpus would
   settle it and has not been done.
 
 ## Next
 
-1. **Shuffle-buffer resample** to remove the prefix concern — cheap, and it is the one
-   limitation that could change the numbers rather than their interpretation.
-2. **Embedder robustness** — repeat with a second embedding model.
-3. **Scale to 50k/class** — the effect is small enough that a tighter estimate is worth
-   the CPU, and the corpus supports it for free.
-4. **The same test on DeepSeek-R1 traces**, the paper's other subject model, if an
+1. ~~Shuffle-buffer resample~~ — **done**, sign unchanged.
+2. ~~Embedder robustness~~ — **done**, effect larger with mpnet.
+3. ~~Scale up~~ — **done** at 5,000/class.
+4. **Run the paper's own judge-based measure on these same traces.** If an LLM judge
+   disagrees with HSE here, that is a finding about the instruments and the most
+   informative thing left. Our result is only as strong as the claim that HSE measures
+   what their judge measures, and that has never been checked on shared inputs.
+5. **The same test on DeepSeek-R1 traces**, the paper's other subject model, if an
    openly-licensed corpus with correctness labels exists.
+6. **Length-matched subsample.** Compare correct and incorrect traces at matched word
+   count. It will shrink the sample hard, but it separates "diversity anti-predicts
+   correctness" from "long traces are both more diverse and more often wrong".
