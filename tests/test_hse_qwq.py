@@ -115,3 +115,13 @@ def test_default_is_the_papers_convention():
     from analysis.hse_qwq import measure
 
     assert inspect.signature(measure).parameters["degenerate"].default == "zero"
+
+
+def test_shuffle_buffer_defaults_on():
+    """A streamed PREFIX is a systematic slice if the corpus is ordered. That was the
+    largest stated limitation of the first run; the default must not reintroduce it."""
+    import inspect
+
+    from analysis.hse_qwq import load_balanced
+
+    assert inspect.signature(load_balanced).parameters["shuffle_buffer"].default > 0

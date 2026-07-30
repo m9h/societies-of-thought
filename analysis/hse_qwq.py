@@ -39,16 +39,25 @@ from analysis.hse import MIN_SEGMENTS, hierarchic_social_entropy, segment
 DATASET = "PrimeIntellect/NuminaMath-QwQ-CoT-5M"
 
 
-def load_balanced(n_per_class: int, seed: int = 0, scan_cap: int = 400_000):
+def load_balanced(n_per_class: int, seed: int = 0, scan_cap: int = 2_000_000,
+                  shuffle_buffer: int = 100_000):
     """Stream the dataset and take a balanced sample of correct/incorrect traces.
 
     Streaming rather than downloading: the corpus is 43.8GB and we need thousands of
     traces, not millions. Balanced by outcome because the comparison is within-model
     across outcome, so unequal group sizes buy nothing.
+
+    `shuffle_buffer` matters for validity, not speed. Taking the stream's PREFIX means
+    that if the corpus is ordered -- by problem, difficulty, or generation batch -- the
+    sample is a systematic slice rather than a draw. A reservoir of this size, seeded,
+    makes the sample effectively random over a large window. Set 0 to disable and take the
+    prefix (reproduces the original run; not recommended).
     """
     from datasets import load_dataset
 
     ds = load_dataset(DATASET, split="train", streaming=True)
+    if shuffle_buffer:
+        ds = ds.shuffle(seed=seed, buffer_size=shuffle_buffer)
     pos, neg, scanned = [], [], 0
     for r in ds:
         scanned += 1
@@ -61,7 +70,8 @@ def load_balanced(n_per_class: int, seed: int = 0, scan_cap: int = 400_000):
             break
         if scanned >= scan_cap:
             break
-    print(f"scanned {scanned} rows -> {len(pos)} correct, {len(neg)} incorrect")
+    print(f"scanned {scanned} rows -> {len(pos)} correct, {len(neg)} incorrect "
+          f"(shuffle_buffer={shuffle_buffer})")
     rows = pos + neg
     random.Random(seed).shuffle(rows)
     return rows
@@ -201,12 +211,16 @@ def main() -> None:
     ap.add_argument("--model", default="sentence-transformers/all-MiniLM-L6-v2")
     ap.add_argument("--out", type=Path, default=Path("results/qwq/hse_qwq.json"))
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--shuffle-buffer", type=int, default=100_000,
+                    help="reservoir size for streaming shuffle; 0 takes the prefix "
+                         "(a systematic slice if the corpus is ordered)")
     ap.add_argument("--degenerate", choices=("zero", "drop"), default="zero",
                     help="single-voice traces: score 0 (the paper's convention, default) "
                          "or drop them (inverts the result -- see measure() docstring)")
     args = ap.parse_args()
 
-    rows = load_balanced(args.n_per_class, args.seed)
+    rows = load_balanced(args.n_per_class, args.seed,
+                         shuffle_buffer=args.shuffle_buffer)
     recs, dropped = measure(rows, args.model, degenerate=args.degenerate)
     print(f"\nmeasured {len(recs)} traces with >= {MIN_SEGMENTS} segments")
     summary = report(recs, dropped)
@@ -214,6 +228,7 @@ def main() -> None:
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(
         {"dataset": DATASET, "embedder": args.model, "seed": args.seed,
+         "shuffle_buffer": args.shuffle_buffer, "n_per_class": args.n_per_class,
          "summary": summary, "per_trace": recs}, indent=1))
     print(f"\nwrote {args.out}")
 
