@@ -60,7 +60,8 @@ MAX_TOKENS = 16384
 @app.function(image=image, gpu=GPU, volumes={"/cache": cache, "/out": out},
               timeout=120 * 60, env=ENV, retries=1,
               secrets=[modal.Secret.from_name("huggingface-secret")])
-def generate_shard(shard: int, n_shards: int, attempt: int, seed: int = 0) -> dict:
+def generate_shard(shard: int, n_shards: int, attempt: int, seed: int = 0,
+                   source: str = "", samples: int = 1, tag: str = "") -> dict:
     import json
     import random
     import re
@@ -72,6 +73,10 @@ def generate_shard(shard: int, n_shards: int, attempt: int, seed: int = 0) -> di
     # Non-math only: NuminaMath already covers math, and the open question is whether the
     # null generalises beyond it.
     pool = [r for r in pool if r["gradable"] and r["source"] != "math_hard"]
+    if source:
+        # Restrict to one domain. Used to push a single domain's estimate: GPQA is the
+        # only one where the length-matched effect survived, and it needs more data.
+        pool = [r for r in pool if r["source"] == source]
     rng = random.Random(seed)
     rng.shuffle(pool)
     problems = pool[:attempt][shard::n_shards]
@@ -82,13 +87,18 @@ def generate_shard(shard: int, n_shards: int, attempt: int, seed: int = 0) -> di
     llm = LLM(model=MODEL, tensor_parallel_size=2, dtype="bfloat16", seed=seed,
               gpu_memory_utilization=0.90, max_model_len=20480)
     tok = llm.get_tokenizer()
-    sp = SamplingParams(temperature=0.6, top_p=0.95, max_tokens=MAX_TOKENS, seed=seed)
+    # `n` samples per problem: the within-problem comparison needs the SAME problem to
+    # yield both correct and incorrect traces, which only happens with repeated sampling.
+    sp = SamplingParams(temperature=0.6, top_p=0.95, max_tokens=MAX_TOKENS, seed=seed,
+                        n=samples)
 
     prompts = [tok.apply_chat_template(
         [{"role": "user", "content": p["task"]}], tokenize=False,
         add_generation_prompt=True) for p in problems]
     gen = llm.generate(prompts, sp)
-    outs = [(o.outputs[0].text, o.outputs[0].finish_reason) for o in gen]
+    # Flatten (problem, sample) -> one record each, keeping the problem id so the
+    # within-problem analysis can group on it.
+    outs = [[(c.text, c.finish_reason) for c in o.outputs] for o in gen]
 
     _BOX = re.compile(r"\\boxed\{([^{}]*)\}")
 
@@ -101,18 +111,19 @@ def generate_shard(shard: int, n_shards: int, attempt: int, seed: int = 0) -> di
         return tail[-1] if tail else ""
 
     recs, n_ok, n_trunc = [], 0, 0
-    for p, (o, finish) in zip(problems, outs):
-        truncated = (finish == "length")
-        n_trunc += truncated
-        ans = final_answer(o)
-        ok = bool(is_correct(ans, p["answer"], p.get("options") or None))
-        n_ok += ok
-        recs.append({"pid": p["pid"], "source": p["source"], "subtask": p["subtask"],
-                     "answer": p["answer"], "extracted": ans[:200],
-                     "correct": ok, "truncated": truncated, "finish_reason": finish,
-                     "response": o.strip()})
+    for p, cands in zip(problems, outs):
+        for k, (o, finish) in enumerate(cands):
+            truncated = (finish == "length")
+            n_trunc += truncated
+            ans = final_answer(o)
+            ok = bool(is_correct(ans, p["answer"], p.get("options") or None))
+            n_ok += ok
+            recs.append({"pid": p["pid"], "sample": k, "source": p["source"],
+                         "subtask": p["subtask"], "answer": p["answer"],
+                         "extracted": ans[:200], "correct": ok, "truncated": truncated,
+                         "finish_reason": finish, "response": o.strip()})
 
-    Path(f"/out/qwqdom_{shard:03d}.json").write_text(json.dumps(recs))
+    Path(f"/out/qwqdom_{tag}{shard:03d}.json").write_text(json.dumps(recs))
     out.commit()
     print(f"shard {shard}: {len(recs)} traces, {n_ok} correct "
           f"({100*n_ok/max(len(recs),1):.1f}%), {n_trunc} truncated "
@@ -129,10 +140,12 @@ def assemble() -> dict:
     rows = []
     for f in sorted(Path("/out").glob("qwqdom_*.json")):
         rows += json.loads(f.read_text())
+    # With repeated sampling a pid appears once per sample, so dedupe on (pid, sample).
     seen, uniq = set(), []
     for r in rows:
-        if r["pid"] not in seen:
-            seen.add(r["pid"])
+        key = (r["pid"], r.get("sample", 0))
+        if key not in seen:
+            seen.add(key)
             uniq.append(r)
     Path("/out/qwq_domains.json").write_text(json.dumps(uniq))
     out.commit()
@@ -156,9 +169,10 @@ def assemble() -> dict:
 
 
 @app.local_entrypoint()
-def main(attempt: int = 4000, shards: int = 4, seed: int = 0):
+def main(attempt: int = 4000, shards: int = 4, seed: int = 0,
+         source: str = "", samples: int = 1, tag: str = ""):
     results = list(generate_shard.starmap(
-        [(i, shards, attempt, seed) for i in range(shards)]))
+        [(i, shards, attempt, seed, source, samples, tag) for i in range(shards)]))
     tot = sum(r["n"] for r in results)
     ok = sum(r["n_correct"] for r in results)
     tr = sum(r.get("n_truncated", 0) for r in results)

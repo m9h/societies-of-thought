@@ -1,0 +1,150 @@
+{
+ "metric": "hse_norm",
+ "n_input": 4000,
+ "n_measured": 3929,
+ "n_single_voice": 128,
+ "dropped": {
+  "truncated": 71,
+  "empty": 0
+ },
+ "unadjusted": {
+  "correct_mean": 0.270639324027819,
+  "incorrect_mean": 0.2600077088280946,
+  "difference": 0.010631615199724387,
+  "ci95_low": 0.005281718359085933,
+  "ci95_high": 0.01598151204036284,
+  "ci_excludes_zero": true,
+  "n_correct": 2583,
+  "n_incorrect": 1346
+ },
+ "matched": {
+  "metric": "hse_norm",
+  "caliper": 0.05,
+  "n_pairs": 1310,
+  "difference": 0.005041406105375409,
+  "ci95_low": -0.0014199618471423371,
+  "ci95_high": 0.011502774057893156,
+  "ci_excludes_zero": false,
+  "mean_words_correct": 1696.5770992366413,
+  "mean_words_incorrect": 1760.5167938931297,
+  "max_relative_length_gap": 0.17270066897156194
+ },
+ "by_domain": {
+  "bbh": {
+   "n": 2666,
+   "n_correct": 1762,
+   "n_incorrect": 904,
+   "words_correct": 1243.4625425652666,
+   "words_incorrect": 880.7533185840708,
+   "unadjusted": {
+    "correct_mean": 0.26815454058412397,
+    "incorrect_mean": 0.26363524696048724,
+    "difference": 0.004519293623636733,
+    "ci95_low": -0.0026237027967290633,
+    "ci95_high": 0.01166229004400253,
+    "ci_excludes_zero": false,
+    "n_correct": 1762,
+    "n_incorrect": 904
+   },
+   "matched": {
+    "metric": "hse_norm",
+    "caliper": 0.05,
+    "n_pairs": 878,
+    "difference": -0.00036640626536103165,
+    "ci95_low": -0.009204816555424425,
+    "ci95_high": 0.008472004024702362,
+    "ci_excludes_zero": false,
+    "mean_words_correct": 852.7380410022779,
+    "mean_words_incorrect": 888.9510250569476,
+    "max_relative_length_gap": 0.3248359832457153
+   }
+  },
+  "mmlu_pro": {
+   "n": 267,
+   "n_correct": 208,
+   "n_incorrect": 59,
+   "words_correct": 2233.1490384615386,
+   "words_incorrect": 2541.576271186441,
+   "unadjusted": {
+    "correct_mean": 0.2892954386417962,
+    "incorrect_mean": 0.28243122390919195,
+    "difference": 0.006864214732604235,
+    "ci95_low": -0.00924415904880383,
+    "ci95_high": 0.0229725885140123,
+    "ci_excludes_zero": false,
+    "n_correct": 208,
+    "n_incorrect": 59
+   },
+   "matched": {
+    "metric": "hse_norm",
+    "caliper": 0.05,
+    "n_pairs": 59,
+    "difference": 0.006549786509476176,
+    "ci95_low": -0.012496869348190606,
+    "ci95_high": 0.025596442367142955,
+    "ci_excludes_zero": false,
+    "mean_words_correct": 2468.5423728813557,
+    "mean_words_incorrect": 2541.576271186441,
+    "max_relative_length_gap": 0.1429993683227596
+   }
+  },
+  "gpqa": {
+   "n": 560,
+   "n_correct": 354,
+   "n_incorrect": 206,
+   "words_correct": 3930.7203389830506,
+   "words_incorrect": 5528.810679611651,
+   "unadjusted": {
+    "correct_mean": 0.2865217485059835,
+    "incorrect_mean": 0.2633753521134307,
+    "difference": 0.02314639639255278,
+    "ci95_low": 0.015851683478966032,
+    "ci95_high": 0.03044110930613953,
+    "ci_excludes_zero": true,
+    "n_correct": 354,
+    "n_incorrect": 206
+   },
+   "matched": {
+    "metric": "hse_norm",
+    "caliper": 0.05,
+    "n_pairs": 183,
+    "difference": 0.013300701794901705,
+    "ci95_low": 0.006048419260976846,
+    "ci95_high": 0.020552984328826563,
+    "ci_excludes_zero": true,
+    "mean_words_correct": 5091.912568306011,
+    "mean_words_incorrect": 5207.420765027322,
+    "max_relative_length_gap": 0.060684466957137646
+   }
+  },
+  "musr": {
+   "n": 436,
+   "n_correct": 259,
+   "n_incorrect": 177,
+   "words_correct": 1572.4324324324325,
+   "words_incorrect": 1932.915254237288,
+   "unadjusted": {
+    "correct_mean": 0.2508529855058618,
+    "incorrect_mean": 0.23008671234082353,
+    "difference": 0.02076627316503829,
+    "ci95_low": 0.006863380380075126,
+    "ci95_high": 0.034669165950001454,
+    "ci_excludes_zero": true,
+    "n_correct": 259,
+    "n_incorrect": 177
+   },
+   "matched": {
+    "metric": "hse_norm",
+    "caliper": 0.05,
+    "n_pairs": 152,
+    "difference": 0.010124979727681704,
+    "ci95_low": -0.0035269146685318227,
+    "ci95_high": 0.02377687412389523,
+    "ci_excludes_zero": false,
+    "mean_words_correct": 1673.2697368421052,
+    "mean_words_incorrect": 1721.2763157894738,
+    "max_relative_length_gap": 0.06514191800642455
+   }
+  }
+ }
+}
