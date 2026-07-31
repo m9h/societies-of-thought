@@ -60,7 +60,11 @@ def _measure(rows, encoder):
     for r in rows:
         trace = r.get("response") or ""
         segs = segment(trace)
-        rec = {"correct": bool(r.get("correct")), "source": r.get("source", "?"),
+        # pid and sample are carried through so `analysis.within_problem` can group by
+        # problem -- the control that holds difficulty fixed. Without them the two
+        # modules cannot compose and the strongest test of the GPQA effect is unrunnable.
+        rec = {"pid": r.get("pid"), "sample": r.get("sample", 0),
+               "correct": bool(r.get("correct")), "source": r.get("source", "?"),
                "words": len(trace.split()), "n_segments": len(segs),
                "single_voice": False}
         if len(segs) < MIN_SEGMENTS:
@@ -111,7 +115,7 @@ def analyse(rows, metric: str = "hse_norm", encoder=None,
            "n_single_voice": n_single, "dropped": dropped,
            "unadjusted": _unadjusted(recs, metric) if recs else None,
            "matched": match_on_length(recs, metric, caliper) if recs else {"n_pairs": 0},
-           "by_domain": {}}
+           "by_domain": {}, "per_trace": recs}
 
     by = defaultdict(list)
     for r in recs:

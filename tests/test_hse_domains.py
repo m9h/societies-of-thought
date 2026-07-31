@@ -141,3 +141,24 @@ def test_empty_input_does_not_crash():
     assert res["n_measured"] == 0
     with pytest.raises(KeyError):
         _ = res["by_domain"]["bbh"]
+
+
+def test_per_trace_records_carry_pid_for_within_problem_grouping():
+    """analysis/within_problem.py groups traces by pid to hold the problem fixed. Without
+    pid on the measured records the two modules cannot compose, and the within-problem
+    control -- the strongest test of the GPQA effect -- is unrunnable."""
+    rows = ([_rec("p1", "gpqa", True, False, SHIFTY),
+             _rec("p1", "gpqa", False, False, SHIFTY * 2),
+             _rec("p2", "gpqa", True, False, SHIFTY)])
+    res = analyse(rows, encoder=_FakeEncoder())
+    assert "per_trace" in res, "measured records must be returned for downstream analysis"
+    assert {r["pid"] for r in res["per_trace"]} == {"p1", "p2"}
+
+
+def test_per_trace_records_carry_sample_index_when_present():
+    rows = [{"pid": "p1", "sample": 0, "source": "gpqa", "subtask": "gpqa",
+             "correct": True, "truncated": False, "response": SHIFTY},
+            {"pid": "p1", "sample": 1, "source": "gpqa", "subtask": "gpqa",
+             "correct": False, "truncated": False, "response": SHIFTY * 2}]
+    res = analyse(rows, encoder=_FakeEncoder())
+    assert sorted(r["sample"] for r in res["per_trace"]) == [0, 1]
