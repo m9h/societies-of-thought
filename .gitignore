@@ -16,3 +16,9 @@ results/ml-intern-postmortem/
 
 # Derived Claim B parquets (regenerate: python -m rl.claimB_data)
 rl/data/claimB/
+
+# Raw generation corpora are large (100MB+) and reproducible from the Modal apps.
+# The MEASURED outputs (hse_*.json, within_problem_*.json) are what the findings rest
+# on and are tracked. GitHub rejects >100MB, which is how this was caught.
+results/qwq/qwq_domains.json
+results/**/*_traces.json

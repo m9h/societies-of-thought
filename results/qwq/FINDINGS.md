@@ -1,4 +1,12 @@
 # Within QwQ, perspective diversity carries no independent signal about correctness
+> **UPDATE 2026-07-31 — the non-math extension is complete; see `GPQA_within_problem.md`.**
+> Across four non-math domains (6,689 QwQ traces) the pooled length-matched effect is small
+> (+0.0066) and only GPQA separated (+0.0110, 1,003 pairs). Holding the *problem* fixed via
+> 6 samples per problem, GPQA gives **+0.0023 [−0.0032, +0.0078] — no difference**, and the
+> between-problem estimate sits 3.1 SE outside that interval, so it is excluded rather than
+> unresolved. The two significant results in this whole line of work (math negative, GPQA
+> positive) point in opposite directions and each dissolves under its own control. The
+> math-only limitation below is now closed.
 
 *Judge-free test of SoT's mediation claim on 10,000 QwQ traces. Code: `analysis/hse_qwq.py`
 (measurement), `analysis/hse_qwq_length.py` (length control), `analysis/hse_qwq_compare.py`

@@ -1,0 +1,14 @@
+{
+ "metric": "hse_norm",
+ "n_problems_total": 767,
+ "n_problems_used": 168,
+ "n_problems_all_correct": 388,
+ "n_problems_all_incorrect": 211,
+ "difference": 0.0023115756988338343,
+ "ci95_low": -0.0031683603288078744,
+ "ci95_high": 0.007791511726475543,
+ "ci_excludes_zero": false,
+ "mean_words_correct": 5349.365178571429,
+ "mean_words_incorrect": 5398.768452380952,
+ "source": "gpqa"
+}
