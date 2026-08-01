@@ -190,3 +190,30 @@ and what we used.
 Which means the field's mechanistic understanding of reasoning models currently rests on a
 model that is an *impersonation* of one. Training an SAE on a genuinely RL'd reasoner
 (QwQ-32B) is the obvious next step, and nobody has done it.
+
+---
+
+## Related
+
+Part of one program — a controls-first, open-weights attempt to make the 2025–26 interpretability
+claims checkable:
+
+| repo | what |
+|---|---|
+| [spinning-up-in-mech-interp](https://github.com/m9h/spinning-up-in-mech-interp) | the **curriculum** — 8 rungs, 6 runnable on a laptop, each ending in its own null |
+| [jacobian-lens](https://github.com/m9h/jacobian-lens) | the **research** — OLMo post-training ladder, metacognition, the Consciousness-Indicator Scorecard |
+| [tri-lens](https://github.com/m9h/tri-lens) | do **three instruments agree** about the same activation? |
+| [societies-of-thought](https://github.com/m9h/societies-of-thought) | the **adversarial replication** — rebuild a no-code/no-data paper, then try to break it |
+| [controls-and-trajectories](https://github.com/m9h/controls-and-trajectories) | the **published datasets** — nulls and developmental trajectories |
+
+This repo is the program's stress test: the paper ships nothing, so everything is rebuilt from
+public artifacts and every claim is run against the control that could kill it. Three results have
+been retracted or corrected here after exactly that treatment — see
+`results/steering/RECHECK_length_and_filtering.md` and `results/qwq/FINDINGS.md`.
+
+**Direct link to tri-lens.** Our open question is an instrument-agreement question: our diversity
+nulls are nulls *for* Hierarchic Social Entropy, and HSE has never been run against the paper's own
+LLM judge on shared inputs. If two instruments disagree about the same traces, that belongs
+alongside the three-instrument study.
+
+Datasets: [sot-priming-traces-dialogue-monologue](https://huggingface.co/datasets/mhough/sot-priming-traces-dialogue-monologue) (the corpus the paper does not ship).
