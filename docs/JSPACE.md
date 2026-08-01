@@ -1,4 +1,13 @@
 # The same claim, twice
+> **STATUS 2026-08-01.** Both projects have moved a long way since this was written
+> (2026-07-12). Current cross-project state, including a **retraction** of our steering
+> "redundant society" result that this document's framing predates, is in
+> `~/Workspace/jacobian-lens/NOTE_FROM_SOT_AGENT.md`. Read that before citing anything
+> here. Headlines: Claim B replicated faithfully (priming, not dialogue —
+> `results/claimB/RESULT_faithful.md`); the diversity claim is null at every level of
+> control (`results/qwq/`); and steering raises diversity rather than lowering it, while
+> accuracy still collapses, so diversity and accuracy are **decoupled**
+> (`results/steering/RECHECK_length_and_filtering.md`).
 
 *Why this repo's design is the missing control in Anthropic's global-workspace paper.*
 *Written 2026-07-12. Companion work lives in `~/Workspace/jacobian-lens`.*
