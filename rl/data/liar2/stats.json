@@ -1,0 +1,18 @@
+{
+ "train": {
+  "n": 18369,
+  "verdicts": {
+   "true": 4811,
+   "false": 10591,
+   "half-true": 2967
+  }
+ },
+ "test": {
+  "n": 1024,
+  "verdicts": {
+   "true": 256,
+   "false": 600,
+   "half-true": 168
+  }
+ }
+}
