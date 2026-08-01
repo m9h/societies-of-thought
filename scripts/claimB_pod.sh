@@ -114,12 +114,41 @@ if [ "$ARM" != "baseline" ] && [ ! -f "$CKPT/config.json" ]; then
   [ -f "$CKPT/config.json" ] || { echo "priming produced no checkpoint" >&2; exit 1; }
 fi
 
+# --- 4b. publish the primed weights ---------------------------------------------
+# The PPO checkpoints below are deliberately not kept (16GB each; they filled a 200GB
+# disk once). The SFT-PRIMED checkpoint is a different thing: ~6GB, written once, and it
+# is the single most reusable artifact this experiment produces -- every downstream run
+# (C6 transfer, seeds, another base model) starts from it. The first Claim B run
+# conflated the two, kept neither, and the primed weights died with the pods. Nobody,
+# including us, can now start from them.
+#
+# Upload is non-fatal: a failed push must not kill a paid run. But it is loud, because a
+# silent failure here is exactly how the artifact was lost the first time.
+if [ "$ARM" != "baseline" ] && [ -n "${HF_TOKEN:-}" ] && [ "${PUBLISH_CKPT:-1}" = "1" ]; then
+  REPO="${CKPT_REPO:-mhough/sot-primed-$MODEL_TAG-$ARM}"
+  echo "$(date -Is) publishing primed checkpoint -> $REPO"
+  "$PY" -m pip install -q huggingface_hub 2>/dev/null
+  "$PY" - "$CKPT" "$REPO" <<'PYEOF' || echo "CHECKPOINT UPLOAD FAILED (run continues)" >&2
+import os, sys
+from huggingface_hub import HfApi
+ckpt, repo = sys.argv[1], sys.argv[2]
+api = HfApi(token=os.environ["HF_TOKEN"])
+api.create_repo(repo, repo_type="model", private=True, exist_ok=True)
+api.upload_folder(folder_path=ckpt, repo_id=repo, repo_type="model",
+                  ignore_patterns=["_trainer/*", "*.lock"],
+                  commit_message="SFT-primed checkpoint before PPO")
+print("uploaded", repo)
+PYEOF
+fi
+
 # --- 5. the identical PPO, from this arm's starting weights ---------------------
 # SAVE_FREQ=-1 (no mid-run PPO checkpoints) by default. Each verl checkpoint is ~16GB
 # of actor+critic+optimiser state; at save_freq=100 three finished arms left 147GB on a
 # 200GB disk and the NEXT run died mid-save with "No space left on device" at step 100.
-# The result of this experiment is the val curve in the log, not the weights, so do not
-# write them. Set SAVE_FREQ=100 deliberately if a run's weights are actually wanted.
+# The result of this experiment is the val curve in the log, not the PPO weights, so do
+# not write them. Set SAVE_FREQ=100 deliberately if a run's weights are actually wanted.
+# NOTE: this applies to PPO checkpoints ONLY. The SFT-primed checkpoint is published in
+# step 4b above -- it is small, reusable, and losing it was a real cost the first time.
 BASE_MODEL="$MODEL"; [ "$ARM" != "baseline" ] && BASE_MODEL="$CKPT"
 echo "$(date -Is) PPO $ARM from $BASE_MODEL"
 setsid nohup "$PY" -m verl.trainer.main_ppo \

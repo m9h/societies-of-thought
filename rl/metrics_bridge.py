@@ -64,16 +64,80 @@ def _open_tracker(project: str, run: str, config: dict | None):
     return trackio
 
 
+class _TrackerThread:
+    """Own the tracker on a single background thread and talk to it through a queue.
+
+    Trackio's init state is thread-affine: initialising on one thread and logging from
+    another raises "Call trackio.init() before trackio.log()". So the thread that inits
+    must also be the thread that logs -- a naive timeout wrapper around init alone is
+    both broken and useless, which our tests caught immediately.
+
+    Everything the tracker does happens here, and the caller only ever enqueues. A slow,
+    hanging or exploding tracker therefore costs a background thread and nothing else;
+    the JSONL sink in `bridge` is untouched. Trackio was measured initialising in ~0.6s,
+    so this should never engage -- it exists because when it did hang, three training
+    arms recorded zero metrics while the process looked perfectly alive.
+    """
+
+    def __init__(self, project: str, run: str, config: dict | None, timeout: float):
+        import queue
+        import threading
+
+        self._q: "queue.Queue" = queue.Queue(maxsize=10_000)
+        self._ready = threading.Event()
+        self._ok = False
+        self._thread = threading.Thread(
+            target=self._serve, args=(project, run, config), daemon=True)
+        self._thread.start()
+        self._ready.wait(timeout=timeout)
+        if not self._ok:
+            print("tracker not ready; JSONL only")
+
+    def _serve(self, project, run, config):
+        tracker = _open_tracker(project, run, config)
+        self._ok = tracker is not None
+        self._ready.set()
+        if tracker is None:
+            return
+        while True:
+            item = self._q.get()
+            if item is None:
+                try:
+                    tracker.finish()
+                except Exception:
+                    pass
+                return
+            payload, step = item
+            try:
+                tracker.log(payload, step=step)
+            except Exception:
+                pass          # a broken tracker must never interrupt the run
+
+    def log(self, payload: dict, step: int) -> None:
+        if not self._ok:
+            return
+        try:
+            self._q.put_nowait((payload, step))
+        except Exception:
+            pass              # full queue: drop the point, keep the run
+
+    def finish(self) -> None:
+        if self._ok:
+            try:
+                self._q.put_nowait(None)
+            except Exception:
+                pass
+
+
 def bridge(log: Path, out: Path, project: str, run: str, follow: bool,
            poll: float = 5.0, config: dict | None = None,
-           trackio: bool = False) -> int:
+           trackio: bool = True, tracker_timeout: float = 60.0) -> int:
     """Stream `log` into `out` (JSONL), and optionally into Trackio.
 
-    JSONL is the durable artifact and is opened FIRST. Trackio is opt-in via
-    `trackio=True`: `trackio.init()` can block trying to stand up a dashboard, and when
-    it did, the bridge produced no file at all while its process looked alive -- three
-    training arms ran with zero metrics recorded. Nothing optional gets to sit in front
-    of the thing we actually need.
+    JSONL is the durable artifact and is opened FIRST; Trackio is on by default but
+    time-boxed, so a slow or broken tracker degrades to JSONL rather than stalling the
+    run. Trackio init was measured at ~0.6s, and the guard exists because when it did
+    hang, three training arms recorded zero metrics while the process looked alive.
     """
     out.parent.mkdir(parents=True, exist_ok=True)
     seen: set[int] = set()
@@ -89,7 +153,8 @@ def bridge(log: Path, out: Path, project: str, run: str, follow: bool,
     sink = out.open("a")          # create the artifact before anything can block
     sink.write("")
     sink.flush()
-    tracker = _open_tracker(project, run, config) if trackio else None
+    tracker = (_TrackerThread(project, run, config, tracker_timeout)
+               if trackio else None)
     try:
         while True:
             if log.exists():
@@ -104,8 +169,8 @@ def bridge(log: Path, out: Path, project: str, run: str, follow: bool,
                         sink.flush()
                         written += 1
                         if tracker is not None:
-                            payload = {k: v for k, v in rec.items() if k != "step"}
-                            tracker.log(payload, step=rec["step"])
+                            tracker.log({k: v for k, v in rec.items() if k != "step"},
+                                        rec["step"])
                     pos = fh.tell()
             if not follow:
                 break
@@ -115,10 +180,7 @@ def bridge(log: Path, out: Path, project: str, run: str, follow: bool,
     finally:
         sink.close()
         if tracker is not None:
-            try:
-                tracker.finish()
-            except Exception:
-                pass
+            tracker.finish()
     return written
 
 
@@ -132,13 +194,13 @@ def main() -> None:
     ap.add_argument("--poll", type=float, default=5.0)
     ap.add_argument("--config", type=str, default=None,
                     help="JSON blob recorded with the run (arm, model, seed, ...)")
-    ap.add_argument("--trackio", action="store_true",
-                    help="also stream to Trackio (opt-in: init can block)")
+    ap.add_argument("--no-trackio", action="store_true",
+                    help="write JSONL only; Trackio is on by default and time-boxed")
     args = ap.parse_args()
 
     cfg = json.loads(args.config) if args.config else None
     n = bridge(args.log, args.out, args.project, args.run, args.follow, args.poll, cfg,
-               trackio=args.trackio)
+               trackio=not args.no_trackio)
     print(f"{n} steps -> {args.out}")
 
 

@@ -91,3 +91,32 @@ def test_output_file_is_created_even_with_an_empty_log(tmp_path):
     out = tmp_path / "m.jsonl"
     assert bridge(log, out, "p", "r", follow=False) == 0
     assert out.exists(), "artifact must exist even before the first parsable line"
+
+
+def test_a_hanging_tracker_cannot_block_the_bridge(tmp_path, monkeypatch):
+    """Trackio init hung once and three training arms recorded zero metrics while the
+    process looked alive. Whatever the cause, a slow tracker must never gate the run."""
+    import rl.metrics_bridge as mb
+
+    def _hang(*a, **k):
+        import time
+        time.sleep(30)
+
+    monkeypatch.setattr(mb, "_open_tracker", _hang)  # init never returns
+    log = tmp_path / "p.log"
+    log.write_text(REAL)
+    out = tmp_path / "m.jsonl"
+
+    import time
+    t0 = time.time()
+    n = mb.bridge(log, out, "p", "r", follow=False, trackio=True, tracker_timeout=2.0)
+    assert n == 1, "metrics must still be written when the tracker hangs"
+    assert time.time() - t0 < 15, "bridge must not wait on a hanging tracker"
+
+
+def test_trackio_is_enabled_by_default_now_that_it_is_guarded():
+    import inspect
+
+    from rl.metrics_bridge import bridge
+
+    assert inspect.signature(bridge).parameters["trackio"].default is True
