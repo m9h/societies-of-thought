@@ -39,6 +39,54 @@ v turning positive (+0.211). The two fits bracket the truth (dropping long trace
 mechanically deflates a and inflates v); a proper censored likelihood is the fix. The
 α = 1.693 collapse (a ≈ 5, v ≈ −2.5) is invariant to the sensitivity.
 
+## Robustness: inter-trial drift variability changes nothing (`fit_ddm_sv.py`)
+
+Refit with `model="ddm_sdv"` on α ≤ 1.0 (the degenerate condition is qualitatively
+settled and only strains the parameterization). Every contrast is within noise of the
+plain DDM — at α = 1.0: ΔA = +0.321 (P = 1.000), ΔV = +0.428 (P = 1.000). The fitted
+sv itself is near zero (0.040 ± 0.031), which means drift variability does **not**
+absorb the fast-correct/slow-error asymmetry the PPC exposed. That points at the
+censoring/lapse structure as the real missing term — consistent with the dose-dependent
+ceiling shares — rather than heterogeneous evidence quality across problems.
+
+## GPQA diversity-on-drift: the mediation test in DDM coordinates (`fit_gpqa_diversity.py`)
+
+Data: the 2,973 GPQA per-trace records in `results/qwq/hse_domains_v2.json` (QwQ-32B,
+500 problems × 6 samples, truncated traces excluded upstream). Model: DDM with trial-level
+diversity (z-scored `hse_norm`) regressed on both drift and boundary, problem random
+intercept on drift. Length is *inside the likelihood*, so this asks the repo's
+within-problem question without matching anything away.
+
+Three fits, and the sequence is the finding:
+
+| specification | v ~ diversity | a ~ diversity (log) |
+|---|---|---|
+| all problems | **did not converge** (r̂ 3–4) | — |
+| mixed-outcome problems, grand-mean-centered | **+0.100** [+0.055, +0.146] P=1.000 | −0.314 ✱ |
+| mixed-outcome, **within-problem centered** | **+0.0065** [−0.031, +0.044] P=0.61 | **−0.106** [−0.138, −0.076] ✱ |
+
+1. **The all-problems fit fails for a substantive reason:** 79% of GPQA problems are
+   always-right or always-wrong across all 6 samples (`GPQA_within_problem.md`), so their
+   drift intercepts have no finite optimum (complete separation) and chains stick in
+   separate modes. The bimodality finding has a sampling-pathology signature.
+2. **The grand-mean drift effect is between-problem leakage.** +0.100 with P = 1.000
+   collapses to a null under within-problem centering — the DDM independently reproduces
+   the repo's central methodological result (between-problem structure masquerades as a
+   diversity effect) on a different instrument. It also replicates the *magnitude* of the
+   trap: confident CIs, wrong estimand.
+3. **What survives within-problem is a boundary effect, not a drift effect.** Among
+   samples of the same problem, a +1 SD more-diverse trace has ~0.90× the boundary —
+   it *stops earlier* — while extracting no more evidence per kiloword. In SoT's terms:
+   within-problem, perspective diversity is associated with the *termination policy* of
+   reasoning, not with its quality. That is a sharper statement than the HSE null
+   (+0.0023 [−0.0032, +0.0078]) and fully consistent with it.
+
+Caveats: conditioned on mixed-outcome problems (the repo's own limitation); truncated
+traces excluded upstream; hse_norm and rt are joint products of one generation process
+(descriptive mediation, same status as the paper's SEM); one domain, one embedder,
+regex segmentation. Grand-mean comparison fit kept as
+`idata_gpqa_diversity_grandmean_summary.csv`.
+
 ## Posterior predictive check (HSSM simulator at posterior means)
 
 Marginal accuracy and mean RT track the data at all six doses, including sim accuracy
