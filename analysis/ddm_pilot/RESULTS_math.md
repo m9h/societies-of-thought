@@ -66,6 +66,39 @@ feature at the same dose costing −22 points on MATH-Hard while gaining +10 on 
 The DDM says *what* was lost: not deliberation, which if anything increased, but evidence
 per unit of deliberation.
 
+## Matched controls: the decline is specific to the conversational feature
+
+`main_rg.jsonl` also holds six matched-control features at α=1.0 on MATH (n=100 each),
+selected in the original sweep to match feature 30939 on sparsity and max-activation. Same
+fit, same spec:
+
+| feature | Δ drift | P(v↑) | accuracy |
+|---|---|---|---|
+| **30939 (the paper's)** | **−0.336** | **0.001** | **40%** |
+| 26919 | −0.141 | 0.084 | 53% |
+| 20402 | −0.128 | 0.112 | 54% |
+| 10126 | −0.097 | 0.160 | 56% |
+| 3114 | −0.050 | 0.321 | 59% |
+| 5993 | −0.014 | 0.457 | 61% |
+| 22600 | +0.006 | 0.516 | 62% |
+
+**Not one control reaches significance.** Control Δv averages −0.071 (sd 0.061, range
+−0.141 to +0.006); the paper's feature sits **4.4 control-SD below the control mean**.
+Control accuracy averages 57.5% against a 62% baseline — a mild generic cost of steering
+anything — while the paper's feature drops to 40%.
+
+This matters, and it cuts both ways:
+
+- **For the paper:** feature 30939 is *not* an arbitrary direction. Steering it does
+  something specific and large that matched controls do not do. The authors found a real
+  causal handle, which our earlier matched-control work (DiD −2.9% on GPQA) understated.
+- **Against the paper:** what that handle specifically does on MATH-Hard is degrade
+  evidence quality per unit of deliberation. The feature is special, and its special
+  effect is to make multi-step reasoning worse.
+
+The honest one-line version: *the conversational feature is a real, specific lever, and on
+MATH it is a lever in the wrong direction.*
+
 ## Caveats
 
 - **n = 100 per condition**, one feature, one dose. Countdown had six doses × 200.
@@ -76,10 +109,10 @@ per unit of deliberation.
 - **RT = words, not tokens**; lapse fixed at 0.05; z free (0.58).
 - **This is a measurement model.** "Drift" and "boundary" earn their meaning from fit and
   prediction, not from any claim that transformers literally accumulate evidence.
-- The matched-control features (10126, 3114, 20402, 5993, 26919, 22600, each n=100 at
-  α=1.0 on MATH) are **not** fit here. Running them would say whether the drift decline is
-  specific to the conversational feature or is a generic consequence of steering anything —
-  which is the obvious next question and is cheap.
+- **Control comparison is across-feature, not a formal test.** The "4.4 control-SD" figure
+  treats six point estimates as a reference distribution; it is a descriptive contrast, not
+  a hierarchical model over features. It is enough to say the paper's feature is an outlier
+  among its own matched controls, not to put a p-value on it.
 
 ## Correction to `NEXT.md`
 
@@ -97,4 +130,9 @@ python build_math_dataset.py                                   # writes math_pai
 python fit_ddm.py --data math_pair.csv --tag math              # flat
 python fit_ddm.py --data math_pair.csv --tag math --drop-ceiling
 python fit_ddm.py --data math_pair.csv --tag math --hier       # paired on 100 pids
+
+for F in 3114 5993 10126 20402 22600 26919; do            # matched controls
+  python build_math_dataset.py $F
+  python fit_ddm.py --data math_pair_f$F.csv --tag math_f$F
+done
 ```

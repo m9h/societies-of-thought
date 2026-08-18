@@ -46,7 +46,12 @@ def per_trace(rows, model_name: str, degenerate: str = "zero", encoder=None):
         trace = r.get("trace", "") or ""
         words = len(trace.split())
         segs = segment(trace)
-        rec = {"alpha": alpha, "correct": bool(r.get("correct")), "words": words,
+        # pid is carried through so downstream work (the DDM pilot) can pair traces by
+        # problem instead of reconstructing identity from row position and validating the
+        # guess statistically. The source jsonl has it; dropping it was the same omission
+        # already fixed in hse_domains.py.
+        rec = {"pid": r.get("pid"), "sample": r.get("sample", 0),
+               "alpha": alpha, "correct": bool(r.get("correct")), "words": words,
                "n_segments": len(segs), "single_voice": False}
         if len(segs) < MIN_SEGMENTS:
             drops[alpha] += 1

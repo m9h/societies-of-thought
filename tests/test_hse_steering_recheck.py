@@ -63,3 +63,27 @@ def test_matched_comparison_returns_baseline_minus_steered():
     m = matched_vs_baseline(recs, 1.0, caliper=0.02)
     assert m["n_pairs"] > 100
     assert m["difference"] > 0.05, "baseline higher than steered must read positive"
+
+
+def test_per_trace_carries_pid_so_reconstruction_is_unnecessary():
+    """The DDM pilot's build_dataset.py must reconstruct problem identity from row
+    position because this file drops pid, then validate that guess statistically. The
+    source jsonl HAS pid. Carrying it through retires the reconstruction entirely.
+
+    Same bug as hse_domains.py had; fixed there, missed here.
+    """
+    from analysis.hse_steering_recheck import per_trace
+
+    rows = [{"feature": -1, "alpha": 0.0, "trace": SHIFTY, "correct": True, "pid": "p7"},
+            {"feature": 30939, "alpha": 1.0, "trace": SHIFTY, "correct": False,
+             "pid": "p8"}]
+    recs, _ = per_trace(rows, None, degenerate="zero", encoder=_FakeEncoder())
+    assert [r["pid"] for r in recs] == ["p7", "p8"]
+
+
+def test_missing_pid_is_none_not_a_crash():
+    from analysis.hse_steering_recheck import per_trace
+
+    rows = [{"feature": -1, "alpha": 0.0, "trace": SHIFTY, "correct": True}]
+    recs, _ = per_trace(rows, None, degenerate="zero", encoder=_FakeEncoder())
+    assert recs[0]["pid"] is None

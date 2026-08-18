@@ -34,14 +34,22 @@ PAPER_FEATURE = 30939
 CEILING_WORDS = 2400          # same threshold as the Countdown ladder
 
 
-def load_pair(path: Path = SOURCE):
-    """Return (baseline_rows, steered_rows) for the paper's feature at alpha=1.0."""
+def load_pair(path: Path = SOURCE, feature: int = PAPER_FEATURE):
+    """Return (baseline_rows, steered_rows) for one feature at alpha=1.0."""
     rows = [json.loads(ln) for ln in path.read_text().splitlines() if ln.strip()]
     math = [r for r in rows if r.get("task") == TASK]
     base = [r for r in math if r.get("feature") == -1]
-    steer = [r for r in math if r.get("feature") == PAPER_FEATURE
+    steer = [r for r in math if r.get("feature") == feature
              and float(r.get("alpha", 0)) == 1.0]
     return base, steer
+
+
+def all_features(path: Path = SOURCE) -> list[int]:
+    """Every steered feature present at alpha=1.0 on MATH, paper's first."""
+    rows = [json.loads(ln) for ln in path.read_text().splitlines() if ln.strip()]
+    feats = {r["feature"] for r in rows if r.get("task") == TASK
+             and r.get("feature") != -1 and float(r.get("alpha", 0)) == 1.0}
+    return [PAPER_FEATURE] + sorted(f for f in feats if f != PAPER_FEATURE)
 
 
 def to_records(base, steer) -> list[dict]:
@@ -62,7 +70,12 @@ def to_records(base, steer) -> list[dict]:
 
 
 def main() -> None:
-    base, steer = load_pair()
+    import sys
+    feature = int(sys.argv[1]) if len(sys.argv) > 1 else PAPER_FEATURE
+    global OUT
+    if feature != PAPER_FEATURE:
+        OUT = HERE / f"math_pair_f{feature}.csv"
+    base, steer = load_pair(feature=feature)
     if not base or not steer:
         raise SystemExit(f"missing a condition: baseline={len(base)} steered={len(steer)}")
 
