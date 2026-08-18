@@ -5,7 +5,24 @@ Read `RESULTS.md` first — it has the full findings and caveats. Everything bel
 is runnable with `uv venv && uv pip install hssm`; every fit here converged in
 seconds-to-minutes on a laptop CPU.*
 
-## 1. The discriminating experiment (highest value, needs non-committed data)
+## 1. ~~The discriminating experiment~~ — DONE 2026-08-05, see `RESULTS_math.md`
+
+> **RESOLVED.** Drift falls under steering on MATH-Hard: dV = −0.336 (P(v↑)=0.001) flat,
+> −0.282 (P=0.010) with near-ceiling dropped, −0.460 (P=0.000) hierarchical. The paper's
+> story predicted the opposite sign. The boundary half of the prediction is NOT established
+> (Δa swings +0.156 → +0.049 → +0.271 across the three fits) — only drift is.
+>
+> **Correction:** the traces are in the repo. `results/steering/main_rg.jsonl` has 800
+> MATH-Hard rows (baseline + seven features at α=1.0) and carries real `pid`, so the MATH
+> design is exactly paired — 100 shared problems — and needs no position-as-problem
+> reconstruction.
+>
+> Next on this thread: the six matched-control features at α=1.0 on MATH are also in that
+> file, unfit. They answer whether the drift decline is specific to the conversational
+> feature or generic to steering anything.
+
+### original text
+
 
 Fit `fit_ddm.py`'s model to the **MATH-Hard steered traces** (the raw
 `results/steering/*.jsonl` sweep outputs — 5,664 attempts — live on the

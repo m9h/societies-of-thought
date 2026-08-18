@@ -23,12 +23,15 @@ p = argparse.ArgumentParser()
 p.add_argument("--hier", action="store_true", help="add (1|pid) on v")
 p.add_argument("--drop-ceiling", action="store_true",
                help="sensitivity: drop near-ceiling (likely truncated) traces")
+p.add_argument("--data", default="countdown_ladder.csv",
+               help="dataset CSV; the model spec is identical whichever is used")
+p.add_argument("--tag", default="", help="suffix for output files")
 p.add_argument("--draws", type=int, default=500)
 p.add_argument("--tune", type=int, default=500)
 p.add_argument("--chains", type=int, default=2)
 args = p.parse_args()
 
-df = pd.read_csv("countdown_ladder.csv")
+df = pd.read_csv(args.data)
 if args.drop_ceiling:
     df = df[df.near_ceiling == 0]
 df["alpha"] = df["alpha"].astype(str)  # categorical
@@ -58,6 +61,8 @@ idata = model.sample(draws=args.draws, tune=args.tune, chains=args.chains,
 out = ("idata_hier.nc" if args.hier else "idata_flat.nc")
 if args.drop_ceiling:
     out = out.replace(".nc", "_noceil.nc")
+if args.tag:
+    out = out.replace(".nc", f"_{args.tag}.nc")
 idata.to_netcdf(out)
 
 summ = az.summary(idata, filter_vars="like", var_names=["v_", "a_", "t", "z"])
