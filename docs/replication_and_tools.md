@@ -136,8 +136,30 @@ use turn its metaphors into measurements — and the measurements suggest better
 
 ### Instrument 1 — Hierarchic Social Entropy (a judge-free diversity measure)
 
-C3's "perspective diversity" is an LLM that first *infers* the personas and then *scores
-their spread* — a judge grading constructs it invented. Balch's Hierarchic Social Entropy
+> ⚠ **CORRECTED 2026-08-19 after a systematic read of the appendix.** An earlier version of
+> this section called C3's judge "a judge grading constructs it invented". **That is unfair
+> and the appendix refutes it.** Extended Data Fig. 5 validates the judge against ground
+> truth on the Intelligence Squared Debates Corpus (N = 1,196 real conversations, speaker
+> labels hidden, dialogue concatenated into one block): predicted vs actual agent count
+> Spearman ρ = 0.86, turns ρ = 0.89, speaker attribution 82% for two speakers. The judge
+> recovers latent speaker structure it did not invent.
+>
+> The paper also has a **second, judge-independent** diversity instrument (Extended Data
+> Fig. 6): all 32,768 SAE features are classified personality- / expertise-related, and
+> diversity is measured as *coverage* (unique features activated) and *entropy* (evenness
+> across tokens). It corroborates the judge.
+>
+> And it controls for exactly the confound we spent this project on: *"we control for
+> reasoning trace length and problem fixed effects to show that steering conversational
+> surprise activates genuinely more diverse features rather than simply producing longer
+> outputs."* Length and problem fixed effects — both of our controls, anticipated.
+>
+> Our HSE nulls stand as measurements. What does **not** stand is any framing in which the
+> authors were naive about length or used an unvalidated instrument. This is now squarely an
+> **instrument-agreement** question — see `tri-lens`.
+
+C3's "perspective diversity" is measured by an LLM that infers the personas and then scores
+their spread. Balch's Hierarchic Social Entropy
 needs no judge: segment a trace at the paper's own perspective-shift cues, embed the
 segments, integrate the diversity from the clustering dendrogram. We ran it on 1,200
 steered Countdown traces:
