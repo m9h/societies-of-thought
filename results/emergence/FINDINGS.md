@@ -60,17 +60,42 @@ same class of claim.
 ## 4. What the paper's instrument says
 
 `rl/judge.py` implements the LLM-as-judge with the paper's four behaviours and its
-counting convention (*"integer counts, 0 if none are present"*). On 60 stratified traces
-from the same log:
+counting convention (*"integer counts, 0 if none are present"*). Stratified sample, 25
+traces per bin, 245 judged of 250 (5 judge failures, never counted as zeros):
 
 | steps | Q&A | shift | conflict | reconciliation | **n_personas** |
 |---|---|---|---|---|---|
-| 1–23 | 0.876 | 0.438 | 0.000 | 0.000 | **1.00** |
-| 98–119 | 0.311 | 0.000 | 0.000 | 0.000 | **1.00** |
-| 210–232 | 0.230 | 0.000 | 0.000 | 0.000 | **1.00** |
+| 1–23 | 0.561 | 0.236 | 0.000 | 0.000 | **1.00** |
+| 25–49 | 0.449 | 0.395 | 0.162 | 0.108 | **1.00** |
+| 50–72 | 0.232 | 0.372 | 0.070 | 0.023 | **1.00** |
+| 73–97 | 0.288 | 0.138 | 0.013 | 0.038 | **1.00** |
+| 98–119 | 0.250 | 0.198 | 0.063 | 0.010 | **1.00** |
+| 120–141 | 0.299 | 0.041 | 0.000 | 0.000 | **1.00** |
+| 142–165 | 0.249 | 0.102 | 0.011 | 0.045 | **1.00** |
+| 166–187 | 0.286 | 0.037 | 0.012 | 0.012 | **1.00** |
+| 188–209 | 0.363 | 0.102 | 0.015 | 0.015 | **1.00** |
+| 210–232 | 0.262 | 0.060 | 0.000 | 0.000 | **1.00** |
 
-Conflict of perspectives is **exactly zero in 7 of 10 bins**. `n_personas` is **1.00 in
-every bin, first to last**. Nothing rises.
+**`n_personas` is 1.00 in all ten bins.** Not a mean pulled down by outliers — no judged
+trace in the run was scored above one perspective. Conflict of perspectives peaks at 0.162
+early and ends at 0.000. Perspective shift *falls*, 0.236 → 0.060. Question–answering
+falls, 0.561 → 0.262. **Nothing rises.**
+
+Side by side with the marker proxy on the identical traces:
+
+| steps | proxy conflict | single-string share | judge conflict |
+|---|---|---|---|
+| 1–23 | 0.085 | (3 matches) | 0.000 |
+| 50–72 | 1.086 | 35% | 0.070 |
+| 98–119 | 2.721 | **99%** | 0.063 |
+| 166–187 | 1.566 | **100%** | 0.012 |
+| 210–232 | **2.976** | **100%** | **0.000** |
+
+The proxy reports a 35× rise. The judge reports zero. As the proxy's number grows, the
+share of it coming from one repeated string grows with it, reaching 100%.
+
+*(Dominance is only interpretable once there are enough matches to divide: the first bin's
+"100%" comes from three matches total and means nothing. Report it with the count.)*
 
 ### The control that makes this credible
 
@@ -109,7 +134,7 @@ and prompt version, so two instruments cannot be silently mixed inside one curve
 - **Persona extraction.** The paper's judge characterises each perspective and answers
   BFI-10 items from its point of view. Ours returns a count. A richer procedure could
   segment a trace we score as one voice.
-- **n = 13–15 per control set**, 60 traces in the main judge table (250-trace run pending).
+- **n = 13–15 per control set**; 245 traces judged in the main table, 25 per bin.
 - **Countdown.** Arithmetic search by a 3B base model is the paper's own choice of task
   for this figure, but it is not where dialogue would be most expected.
 
