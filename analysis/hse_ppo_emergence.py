@@ -1,4 +1,26 @@
-"""Does the RL 'society of thought' EMERGE -- and is it diverse or redundant?
+"""SUPERSEDED -- use `analysis/emergence.py` and `rl/judge.py` instead.
+
+⚠ This module produced the 2026-07-23 emergence finding (commit ed8d42e), which was
+correct but under-built, and which was then LOST because it was written to a commit
+message and no results file. Two specific reasons not to reach for it again:
+
+  1. It inherits `MIN_SEGMENTS` filtering from `analysis/hse.py`. Dropping traces with
+     too few segments to score is the exact asymmetry that produced this project's
+     retracted steering result -- the drop rate moves with the treatment. Here it
+     discarded 291/300 early and 300/300 late traces, and "there is not enough society
+     to measure" was reported as the finding rather than as an instrument failure.
+  2. It bins EARLY vs LATE only. `analysis/emergence.py` aligns every rollout to the PPO
+     step that consumed it, which is what a curve needs -- and note verl prints a batch's
+     rollouts BEFORE that step's metric line, so the naive alignment is off by one batch.
+
+`analysis/emergence.py` also strips verl's scorer debug echo, which this module leaves in
+78% of traces, and reports `pattern_dominance` so a marker rate driven by one repeated
+string cannot be read as a behaviour. For the paper's own instrument, use
+`analysis/judge_emergence.py`.
+
+Original docstring follows.
+
+Does the RL 'society of thought' EMERGE -- and is it diverse or redundant?
 
 The Societies-of-Thought paper's Claim A: under PPO on Countdown rewarding only
 correctness+format, dialogic / multi-persona structure arises anyway. Our Tier-0
