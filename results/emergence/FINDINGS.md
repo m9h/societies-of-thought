@@ -129,12 +129,14 @@ A judge that always answers 1 would produce this table on any input. It does not
 
 | trace set | n_personas | traces with >1 | shift | reconciliation |
 |---|---|---|---|---|
-| teacher **dialogue** corpus (known multi-persona) | **2.92** | **100%** | 2.15 | 0.92 |
+| teacher **dialogue** corpus (known multi-persona) | **2.87** | **93%** | 2.07 | 0.87 |
 | teacher **monologue** corpus (known single voice) | 1.00 | 0% | 0.20 | 0.07 |
-| **RL traces, step > 200** | **1.00** | **0%** | 0.27 | 0.07 |
+| **RL traces, step > 200** (decontaminated) | **1.00** | **0%** | 0.40 | 0.07 |
+
+n = 15 each, 0 judge failures. Per-trace counts, not rates.
 
 Same judge, same prompt, same session. It recovers ~3 personas when personas are present,
-in 100% of traces. On late-RL traces it recovers one — and the whole row is
+in 93% of traces. On late-RL traces it recovers one — and the whole row is
 indistinguishable from the known-monologue corpus.
 
 **So the two instruments disagree about Fig. 4, and the disagreement is not noise.** Where
