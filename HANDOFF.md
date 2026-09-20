@@ -1,8 +1,9 @@
 # HANDOFF — societies-of-thought
 
-*State as of 2026-08-18. Branch `analysis/ddm-pilot`, **5 commits ahead of `main`**
-(head `3564f18`). 331 tests pass, 3 skipped. RunPod balance **$234.45**, nothing running,
-no pods. Read "The decision waiting for you" last — everything else is context for it.*
+*State as of 2026-09-19. Branch `analysis/ddm-pilot`, **~16 commits ahead of `main`**.
+365 tests pass, 3 skipped (4 collect-error locally on missing torch; they run on the pod).
+RunPod balance was $234.45; **one pod is running Fig. 4 seed 0**. Read §2.5 first — it is
+the newest and most consequential result.*
 
 ---
 
@@ -48,6 +49,34 @@ own control (length; problem identity). `results/qwq/FINDINGS.md`,
 
 **Bonus finding:** QwQ per-problem accuracy is **bimodal, not binomial** — 22% of GPQA
 problems mixed where independence predicts 94%. It either knows a problem or doesn't.
+
+### C4 / Fig. 4 — emergence (**NEW, and the instrument is the story**)
+
+Triggered by a co-author's reply, which assumed our replication attempt had been Fig. 4.
+It had not been. It is now.
+
+**From a log we already had** (`results/rl_ab/tz_train_claimA.log`: un-primed Qwen2.5-3B,
+PPO on Countdown, accuracy-only reward, 232 steps, 1,099 rollouts):
+
+| instrument | verdict on Fig. 4 |
+|---|---|
+| surface markers | conflict of perspectives **rises 12×** — replicates |
+| the same markers, decomposed | **99.8% of late matches are one string**, `doesn't equal` |
+| LLM judge (the paper's instrument) | `n_personas` = **1.00 in every bin**, nothing rises |
+
+> ⚠ The 12× was **RETRACTED within the hour it was measured**. It is a numbered
+> enumeration template — `1. 89-64-6 = 21 (Doesn't equal 19) 2. ...` — not dialogue.
+> Genuinely dialogic markers all fall: *however* 77→1, *let's try another* 22→2.
+> `analysis.emergence.pattern_dominance` now reports single-string share beside any rate.
+
+**The control is what makes the judge result quotable.** Same judge, same prompt, same
+session: the paper's own dialogue prompt's output scores **2.92 personas, >1 in 100% of
+traces**; its monologue output scores 1.00; our late-RL traces score **1.00, 0%** — a row
+indistinguishable from the monologue corpus. The judge finds personas when they are there.
+
+Caveats: that log is `rollout.n=1`/batch 256 (not faithful), one run, judge is Claude not
+Gemini-2.5-Pro. **The faithful run is in flight**, `scripts/fig4_pod.sh`, seeds queued.
+`results/emergence/FINDINGS.md`.
 
 ### C5 — Claim B, faithful replication (done, **n=1**)
 Qwen2.5-3B, 3 arms, 250 steps, the paper's teacher/prompts/out-of-domain pool,
