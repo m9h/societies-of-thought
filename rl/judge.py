@@ -158,8 +158,14 @@ def judge_trace(trace: str, backend, cache=None, model: str = "unknown") -> dict
     return verdict
 
 
-def anthropic_backend(model: str = "claude-opus-5", max_tokens: int = 300):
-    """A judge backend backed by the Anthropic API. Requires ANTHROPIC_API_KEY."""
+def anthropic_backend(model: str = "claude-opus-5", max_tokens: int = 1200):
+    """A judge backend backed by the Anthropic API. Requires ANTHROPIC_API_KEY.
+
+    `max_tokens` is generous on purpose. At 300 a more verbose judge ran out of budget
+    mid-preamble and never reached its JSON, failing on 74% of traces -- and because
+    failures rise with trace length, a truncation budget silently biases which traces
+    get counted.
+    """
     import anthropic
 
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])

@@ -29,6 +29,19 @@ from analysis.hse import segment
 _ANSI = re.compile(r"\x1b\[[0-9;]*m")
 _RAY = re.compile(r"\((?:main_task|WorkerDict|raylet|pid=)[^)]*\)\s?")
 _STEP = re.compile(r"^step:(\d+)\s*-")
+# verl's Countdown scorer echoes every graded rollout back to stdout as
+#   --------------------------------
+#   Target: 18 | Numbers: [50 57 73 52]
+#   Extracted equation: None
+#   Solution string: A conversation between User and Assistant. ...
+# That block lands AFTER the response and BEFORE the next prompt, so a parser that runs
+# to the next "User:" swallows it. It did: 78% of traces carried ~45 words of it. That
+# diluted every rate, and it handed an LLM judge the phrase "A conversation between User
+# and Assistant" -- which biases a persona count in exactly the direction under test.
+# Anchored at line start so a response that merely mentions a target is not truncated.
+_SCORER_DEBUG = re.compile(
+    r"^(?:-{8,}|Target:\s|Extracted equation:|Solution string:)")
+
 _NOISE = re.compile(
     r"^(?:INFO|WARNING|ERROR|DEBUG|\(|Loading checkpoint|Downloading|"
     r"Validation|Adding requests|Processed prompts|\s*$)"
@@ -80,7 +93,13 @@ def parse_rollouts(text: str) -> list[dict]:
                 pending.append(cur)
             cur = {"step": None, "prompt": line[len("User: "):].strip(), "response": ""}
             continue
-        if cur is not None and not _NOISE.match(line):
+        if cur is None:
+            continue
+        if _SCORER_DEBUG.match(line):
+            pending.append(cur)      # the response ended; the scorer is talking now
+            cur = None
+            continue
+        if not _NOISE.match(line):
             cur["response"] += line + "\n"
 
     return out   # `pending` and `cur` are intentionally discarded

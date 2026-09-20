@@ -189,3 +189,36 @@ def test_pattern_dominance_on_no_matches_does_not_divide_by_zero():
     d = pattern_dominance(["plain arithmetic with no markers at all"],
                           "conflict_of_perspectives")
     assert d["total"] == 0 and d["top_share"] == 0.0
+
+
+# --- the scorer's debug output is not part of the response -------------------
+
+
+def test_response_stops_at_the_scorer_debug_block():
+    """verl's Countdown scorer echoes each graded rollout back to stdout as
+    `Target: ... / Extracted equation: ... / Solution string: <the whole prompt>`, and
+    that block lands AFTER the response and BEFORE the next prompt. Swallowing it put
+    ~45 junk words into 78% of parsed traces -- diluting every rate -- and fed an LLM
+    judge the literal phrase "A conversation between User and Assistant", which biases
+    a persona count in the one direction we are trying to rule out."""
+    raw = ("(main_task pid=1) User: Using the numbers [7, 20, 4], create an equation.\n"
+           "(main_task pid=1) Assistant: <think> 7 * 20 - 4 </think>\n"
+           "(main_task pid=1) --------------------------------\n"
+           "(main_task pid=1) Target: 18 | Numbers: [50 57 73 52]\n"
+           "(main_task pid=1) Extracted equation: None\n"
+           "(main_task pid=1) Solution string: A conversation between User and Assistant.\n"
+           "(main_task pid=1) step:4 - critic/score/mean:0.1\n")
+    r = parse_rollouts(raw)[0]
+    assert "7 * 20 - 4" in r["response"]
+    for junk in ("Target:", "Extracted equation:", "Solution string:",
+                 "A conversation between User and Assistant"):
+        assert junk not in r["response"], f"scorer debug leaked into the response: {junk}"
+
+
+def test_the_separator_rule_does_not_truncate_a_real_response():
+    raw = ("(main_task pid=1) User: p\n"
+           "(main_task pid=1) Assistant: <think> first I target 18, then extract it </think>\n"
+           "(main_task pid=1) step:1 - critic/score/mean:0.1\n")
+    r = parse_rollouts(raw)[0]
+    assert "first I target 18, then extract it" in r["response"], \
+        "a response that merely contains the words must not be cut"

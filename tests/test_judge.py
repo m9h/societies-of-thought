@@ -138,3 +138,13 @@ def test_cache_survives_a_new_process(tmp_path):
         raise AssertionError("cache miss after restart -- would re-pay for every trace")
 
     assert judge_trace("t", backend=explode, cache=cache, model="fake")["reconciliation"] == 3
+
+
+def test_the_token_budget_is_not_tight_enough_to_truncate_the_json():
+    """At max_tokens=300 a verbose judge spent its budget on preamble and never emitted
+    JSON -- 74% failures. Failures rise with trace length, so a tight budget biases which
+    traces get counted, in the same direction as every other length artifact here."""
+    import inspect
+
+    from rl.judge import anthropic_backend
+    assert inspect.signature(anthropic_backend).parameters["max_tokens"].default >= 1000
