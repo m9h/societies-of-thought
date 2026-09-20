@@ -54,16 +54,25 @@ fi
 [ -d "$REPO_DIR/.git" ] || git clone -q https://github.com/m9h/societies-of-thought.git "$REPO_DIR"
 [ -d "$TZ/.git" ]       || git clone -q https://github.com/Jiayi-Pan/TinyZero.git "$TZ"
 cd "$REPO_DIR" && git fetch -q origin && git checkout -q "${BRANCH:-analysis/ddm-pilot}" && git pull -q || true
-# pip >= 24.1 rejects the invalid metadata in the old uvicorn wheels that TinyZero's
-# `vllm<=0.6.3` pin drags in ("click (>=7.*)" -- a .* suffix with >=). The resolver then
-# fails the whole verl install. pip itself says the fix: use pip<24.1.
+# TinyZero's verl pins `vllm<=0.6.3`, and resolving that from scratch sends pip
+# backtracking through every uvicorn release down to 0.5.2 -- versions whose setup.py
+# opens a README.md that is not in the sdist, so metadata generation dies. Two variants
+# of that failure have already cost this pod two boots, and both surfaced as a missing
+# parquet rather than as a failed install.
+#
+# So do not let the resolver search. Pin the chain, install it in order, and install verl
+# itself with --no-deps once its requirements are already satisfied.
 if ! "$PY" -c "import verl" 2>/dev/null; then
-  "$PY" - <<'PYEOF' || "$PY" -m pip install -q "pip<24.1"
-import sys
-from importlib.metadata import version
-sys.exit(0 if tuple(int(x) for x in version("pip").split(".")[:2]) < (24, 1) else 1)
-PYEOF
-  (cd "$TZ" && "$PY" -m pip install -q -e .)
+  echo "$(date -Is) installing verl dependency chain (pinned, no resolver search) ..."
+  # uvicorn first: it is the package the backtracking is about. 0.30.6 has the
+  # `standard` extra AND valid metadata, which the pre-0.9 releases do not.
+  "$PY" -m pip install -q "uvicorn[standard]==0.30.6" || true
+  "$PY" -m pip install -q "vllm==0.6.3" \
+    || { echo "vllm==0.6.3 install FAILED -- verl cannot run" >&2; exit 1; }
+  "$PY" -m pip install -q accelerate codetiming datasets dill hydra-core numpy pandas \
+    pyarrow pybind11 ray "tensordict<0.6" "transformers<4.48" wandb \
+    || { echo "verl requirement install FAILED" >&2; exit 1; }
+  (cd "$TZ" && "$PY" -m pip install -q -e . --no-deps)
 fi
 # FAIL HERE, not three steps later. Without this the run continued into a data build
 # that could not work, and the first symptom was a missing parquet -- which reads like a
@@ -74,7 +83,7 @@ fi
 # dependency when that install succeeds, and its absence is how a failed verl install
 # first became visible. Name it explicitly so the dependency is not implicit.
 "$PY" -c "import pandas, pyarrow, datasets" 2>/dev/null \
-  || "$PY" -m pip install -q pandas pyarrow datasets
+  || { echo "pandas/pyarrow/datasets missing after the dependency install" >&2; exit 1; }
 if ! "$PY" -c "import flash_attn" 2>/dev/null; then
   echo "$(date -Is) installing flash-attn (required by verl PPO) ..."
   "$PY" -m pip install -q ninja

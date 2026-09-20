@@ -145,10 +145,23 @@ def test_a_failed_verl_install_stops_the_run():
         "the verl check must come before the data build it gates"
 
 
-def test_pip_is_downgraded_for_the_tinyzero_pin():
-    """pip >= 24.1 rejects the old uvicorn wheel metadata that `vllm<=0.6.3` pulls in,
-    and fails the whole verl install with warnings that look cosmetic."""
-    assert '"pip<24.1"' in _text()
+def test_the_dependency_chain_is_pinned_rather_than_resolved():
+    """Resolving `vllm<=0.6.3` from scratch sends pip backtracking to uvicorn 0.5.2,
+    whose setup.py opens a README.md absent from the sdist. Two pod boots died there,
+    both reporting a missing parquet rather than a failed install."""
+    t = _text()
+    assert '"vllm==0.6.3"' in t, "vllm must be pinned, not left to the resolver"
+    assert '"uvicorn[standard]==0.30.6"' in t, "uvicorn is the package it backtracks on"
+    assert "--no-deps" in t, "verl must not re-resolve what is already installed"
+
+
+def test_every_verl_requirement_is_named_explicitly():
+    """If a requirement is only implied, a partial install looks like success until
+    something three steps later cannot import it."""
+    t = _text()
+    for pkg in ("accelerate", "codetiming", "datasets", "dill", "hydra-core",
+                "pybind11", "ray", '"tensordict<0.6"', '"transformers<4.48"'):
+        assert pkg in t, f"{pkg} is a verl requirement and is not installed explicitly"
 
 
 def test_the_data_build_verifies_its_own_output():

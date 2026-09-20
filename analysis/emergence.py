@@ -129,6 +129,33 @@ def reconciliation(text: str) -> int:
     return len(_RECONCILE.findall(text))
 
 
+_PATTERNS = {"conflict_of_perspectives": _CONFLICT, "reconciliation": _RECONCILE}
+
+
+def pattern_dominance(texts, behaviour: str) -> dict:
+    """How much of a marker count comes from one repeated string.
+
+    A surface-marker rate is only evidence of a behaviour if the language varies. On the
+    claimA log, 99.8% of late-training "conflict of perspectives" matches were the single
+    parenthetical "doesn't equal", emitted once per line of a numbered enumeration -- the
+    measure read as a 12x rise in dialogic behaviour while every genuinely dialogic
+    marker ("however", "nope", "let's try another") fell to near zero. Report this
+    beside any marker rate, or the rate can be a template count wearing a costume.
+    """
+    from collections import Counter
+
+    pat = _PATTERNS[behaviour]
+    c = Counter()
+    for text in texts:
+        for m in pat.finditer(text):
+            c[m.group(0).lower().strip()] += 1
+    total = sum(c.values())
+    if not total:
+        return {"total": 0, "top": None, "top_share": 0.0, "distinct": 0}
+    top, n = c.most_common(1)[0]
+    return {"total": total, "top": top, "top_share": n / total, "distinct": len(c)}
+
+
 BEHAVIOUR_FNS = {
     "question_answering": question_answering,
     "perspective_shift": perspective_shift,

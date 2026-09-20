@@ -159,3 +159,33 @@ def test_behaviours_per_step_reports_a_rate_for_each_of_the_four():
     for b in ("question_answering", "perspective_shift",
               "conflict_of_perspectives", "reconciliation"):
         assert f"{b}_rate" in out, f"no rate reported for {b}"
+
+
+# --- instrument health -------------------------------------------------------
+
+
+def test_pattern_dominance_flags_a_single_template():
+    """A surface-marker measure can be driven entirely by one repeated string. On the
+    claimA log, 99.8% of late 'conflict of perspectives' matches were the single
+    parenthetical "doesn't equal" inside a numbered enumeration -- which scores as a 12x
+    rise in dialogic behaviour while every genuinely dialogic marker went to zero.
+    Any reported marker rate needs this alongside it."""
+    from analysis.emergence import pattern_dominance
+    d = pattern_dominance(["x doesn't equal 1. y doesn't equal 2. z doesn't equal 3."],
+                          "conflict_of_perspectives")
+    assert d["top_share"] > 0.9
+    assert d["top"] == "doesn't equal"
+
+
+def test_pattern_dominance_is_low_for_varied_language():
+    from analysis.emergence import pattern_dominance
+    d = pattern_dominance(["Wait. However, nope. Alternatively, let's try another way."],
+                          "conflict_of_perspectives")
+    assert d["top_share"] < 0.5
+
+
+def test_pattern_dominance_on_no_matches_does_not_divide_by_zero():
+    from analysis.emergence import pattern_dominance
+    d = pattern_dominance(["plain arithmetic with no markers at all"],
+                          "conflict_of_perspectives")
+    assert d["total"] == 0 and d["top_share"] == 0.0
