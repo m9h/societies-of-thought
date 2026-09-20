@@ -53,7 +53,11 @@ problems mixed where independence predicts 94%. It either knows a problem or doe
 ### C4 / Fig. 4 — emergence (**NEW, and the instrument is the story**)
 
 Triggered by a co-author's reply, which assumed our replication attempt had been Fig. 4.
-It had not been. It is now.
+
+⚠ **It had been — on 2026-07-23, commit `ed8d42e`** — and the finding was lost because it
+was written to the commit message and no results file, so it never reached this handoff.
+Both the roadmap and the first draft to the authors then stated we had never run C4. See
+`results/emergence/FINDINGS.md` §0. **Write results to files.**
 
 **From a log we already had** (`results/rl_ab/tz_train_claimA.log`: un-primed Qwen2.5-3B,
 PPO on Countdown, accuracy-only reward, 232 steps, 1,099 rollouts):

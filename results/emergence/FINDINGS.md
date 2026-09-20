@@ -6,6 +6,25 @@ accuracy-only reward, 232 steps, 1,099 logged rollouts — which is the right ex
 under a **non-faithful config** (`rollout.n=1`, train batch 256) and a **single run**.
 Read §5 before quoting any of it.*
 
+## 0. This question was answered once before, and lost
+
+Commit `ed8d42e` (2026-07-23) ran this analysis on this log and concluded *"no dialogic
+society emerges — systematic SEARCH does,"* naming the same `(Doesn't equal N)` enumeration
+template reported in §3 below. That finding was written **into the commit message and
+nowhere else**: it produced no results file, so it never reached `HANDOFF.md`, and after
+the next context compaction the project's own roadmap recorded C4 as "never run."
+
+Two lessons, both cheap to act on:
+
+- **A result that lives only in a commit message is a result you will lose.** The standing
+  discipline here is "write the analysis before the data exists." Its missing counterpart
+  is "write the result to a file, or it did not happen."
+- **The July conclusion was right but under-built.** It rested on the 3-segment threshold
+  (*"only 9/300 early and 0/300 late traces clear it"*) — the same filter whose asymmetry
+  produced the retracted steering result. This version replaces it with the paper's own
+  instrument plus a positive control, which is what makes the null defensible rather than
+  merely correct.
+
 ## 1. The claim
 
 > Controlled reinforcement learning experiments reveal that base models increase

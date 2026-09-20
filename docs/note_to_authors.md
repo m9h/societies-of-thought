@@ -17,9 +17,10 @@ Two, and your guess was half right — so we went and ran the other one.
 **Fig. 8** (the SFT-priming → RL experiment: no priming / dialogue-primed / monologue-primed,
 Qwen-2.5-3B, PPO on Countdown, 250 steps). That is what our attendee was describing.
 
-**Fig. 4** (base model developing conversational behaviour under accuracy-only reward). We
-had *not* run this when you wrote. We have now — see §4, which is the part we would most
-like you to push back on.
+**Fig. 4** (base model developing conversational behaviour under accuracy-only reward) —
+which is what you guessed, and you were right that we had looked at it. We had, in July,
+and we have now redone it properly with your instrument rather than ours. See §4; it is
+the part we would most like you to push back on.
 
 We also ran the feature-30939 steering effect and the perspective-diversity ↔ correctness
 relationship on an independent trace corpus, neither of which needs training.
