@@ -10,19 +10,19 @@ Thank you — and no apology needed on timing.
 Happy to be specific. Short version first, then the numbers, then the handful of places
 where your answer would change what we conclude.
 
-## 1. Which result we tried to replicate
+## 1. Which results we have run
 
-Not Fig. 4. We have **not** attempted the spontaneous-emergence result (conversational
-behaviour arising during RL from an accuracy-only reward) — so the seed caveat and the
-rise-then-fall dynamics from Gandhi et al. don't bear on what we ran, though we'd expect
-them to bear on Fig. 4 itself.
+Two, and your guess was half right — so we went and ran the other one.
 
-What we ran was the **SFT-priming → RL experiment (Extended Data Fig. 8)**: three arms —
-no priming / dialogue-primed / monologue-primed — Qwen-2.5-3B, PPO on Countdown, 250 steps.
+**Fig. 8** (the SFT-priming → RL experiment: no priming / dialogue-primed / monologue-primed,
+Qwen-2.5-3B, PPO on Countdown, 250 steps). That is what our attendee was describing.
 
-We also ran two analysis-side replications that need no training: the **feature-30939
-steering effect**, and the **perspective-diversity ↔ correctness** relationship on an
-independent trace corpus.
+**Fig. 4** (base model developing conversational behaviour under accuracy-only reward). We
+had *not* run this when you wrote. We have now — see §4, which is the part we would most
+like you to push back on.
+
+We also ran the feature-30939 steering effect and the perspective-diversity ↔ correctness
+relationship on an independent trace corpus, neither of which needs training.
 
 ## 2. Our setup, so you can tell us if we got something wrong
 
@@ -91,7 +91,68 @@ per se.
 across 6 samples at T=0.6. Independence would predict ~94% mixed; we see 22%. Per-problem
 accuracy is bimodal, not binomial, which matters for how any per-trace analysis is powered.)
 
-## 4. On seeds — you're right, and here's exactly how far ours reaches
+## 4. Fig. 4: two instruments, two different answers
+
+We ran the un-primed arm — Qwen-2.5-3B base, PPO on Countdown, reward = accuracy only,
+232 steps, 1,099 logged rollouts — and measured the behaviour frequency two ways.
+
+**By counting surface markers, your result replicates and then some.** Conflict of
+perspectives rises 12× across training, as a rate per 100 words rather than a per-trace
+count, so it is not the length increase (166 → 357 words).
+
+**We do not believe that number, and here is why.** Decomposing the matches by which
+string produced them: in late training, **2,090 of 2,095 — 99.8% — are the single phrase
+"doesn't equal"**, emitted once per line of a numbered enumeration:
+
+```
+1. 89 - 64 - 6 = 21 (Doesn't equal 19)
+2. 89 - 64 + 6 = 31 (Doesn't equal 19)
+3. 89 - 6 + 64 = 93 (Doesn't equal 19)   ...
+```
+
+Every genuinely dialogic marker moves the other way over the same steps: *however* 77 → 1,
+*let's try another* 22 → 2, *nope* 26 → 0. The model is converging on a brute-force
+enumeration template that a marker-counting instrument scores as self-disagreement.
+
+**So we built your instrument instead** — an LLM judge over your four behaviours
+(question–answering, perspective shift, conflict of perspectives, reconciliation) with
+your counting convention. On stratified traces from the same run:
+
+| steps | Q&A | shift | conflict | reconciliation | n_personas |
+|---|---|---|---|---|---|
+| 1–23 | 0.876 | 0.438 | 0.000 | 0.000 | **1.00** |
+| 98–119 | 0.311 | 0.000 | 0.000 | 0.000 | **1.00** |
+| 210–232 | 0.230 | 0.000 | 0.000 | 0.000 | **1.00** |
+
+Conflict of perspectives is exactly zero in 7 of 10 bins. `n_personas` is 1.00 in every
+bin, first to last. Nothing rises.
+
+**With the control, because a judge that always says 1 would produce that table on any
+input.** Same judge, same prompt, same session:
+
+| trace set | n_personas | traces with >1 | shift | reconciliation |
+|---|---|---|---|---|
+| your dialogue prompt's own output (32B teacher) | **2.92** | **100%** | 2.15 | 0.92 |
+| your monologue prompt's own output | 1.00 | 0% | 0.20 | 0.07 |
+| **our RL traces, step > 200** | **1.00** | **0%** | 0.27 | 0.07 |
+
+It finds ~3 personas when personas are there, in every trace. On late-RL traces it finds
+one, and the whole row is indistinguishable from the known-monologue corpus.
+
+Our honest summary: **on this run, the answer to Fig. 4 depends entirely on which
+instrument you use**, and we cannot tell from the paper which way yours would fall on a
+numbered enumeration of rejected candidates. That is a question only you can answer, and
+it is the single thing we would most like to hear back about.
+
+Caveats we hold against ourselves: this log is `rollout.n=1` and train batch 256, not your
+config; it is one run; our judge is an Anthropic model rather than Gemini-2.5-Pro (your
+cross-judge ICC ≈ .85 is why we think that is declarable rather than disqualifying); and
+your persona extraction characterises each perspective and answers BFI-10 items from its
+point of view, where ours returns a count — a richer procedure might segment a trace we
+score as one voice. The faithful config is running now, three seeds, and we will send the
+numbers either way.
+
+## 5. On seeds — you're right, and here's exactly how far ours reaches
 
 Ours is **n=1 per arm**. So we can't and don't claim your Fig. 8 result fails to replicate.
 The late-window gaps (|Δ| ≤ 0.02) are well inside plausible run-to-run noise, and we say so
@@ -142,7 +203,7 @@ than the monologue ones (252 vs 144 median words). We notice your Supplementary 
 concatenate personas into one `<think>` block for Llama-3.2-3B specifically, to equalise
 sequence length. We don't see the same control described for Qwen — question below.
 
-## 5. Where your feedback would change our conclusions
+## 6. Where your feedback would change our conclusions
 
 1. **Fig. 8 endpoint.** Caption says converge, main text says higher asymptote. Which is the
    intended claim? Our whole read of (a) turns on this.
@@ -164,16 +225,23 @@ sequence length. We don't see the same control described for Qwen — question b
    priming sets match on Gandhi et al.'s four behaviours (verification, backtracking,
    subgoal setting, backward chaining)? If not, that's an alternative explanation for the
    early gap that doesn't involve dialogue.
-7. **Fig. 4's instrument.** In your multi-seed runs, does the conversational-marker curve
-   rise and then fall? And if it falls, how do you distinguish the behaviour fading from it
-   going implicit, given the explicit-to-implicit transition Gandhi et al. report for Qwen
-   on this exact task?
-8. **Mediation, within-problem.** We know from the SI that you control for trace length and
+7. **Fig. 4's instrument, concretely.** Does your judge score a numbered enumeration of
+   rejected candidates ("1. ... (Doesn't equal 19) 2. ...") as a conflict of perspectives?
+   Ours does not. A judge that did would reproduce our marker-count curve exactly.
+8. **Fig. 4e on Countdown.** Does the judge-inferred persona count rise above 1, and by how
+   much? That one number would tell us immediately whether we are measuring the same thing.
+9. **What the judge reads.** Is Fig. 4b run on training rollouts, on held-out evaluation
+   generations, or on checkpoint samples? Ours are training rollouts at temperature 1.0,
+   which may not be comparable.
+10. **Rise and fall.** In your multi-seed runs, does the marker curve rise and then fall?
+   And if it falls, how do you separate the behaviour fading from it going implicit, given
+   the explicit-to-implicit transition Gandhi et al. report for Qwen on this exact task?
+11. **Mediation, within-problem.** We know from the SI that you control for trace length and
    include problem fixed effects in several analyses. Our question is narrower: in the
    mediation model specifically, is the diversity → accuracy path estimated within-problem?
    Our (c) says that's where the effect lives or dies.
 
-## 6. What would help most, and what we can offer
+## 7. What would help most, and what we can offer
 
 If any of it is shareable before the code release, the three things that would most reduce
 guesswork on our side are: the **problem IDs** for the 8,262-task pool (or just the 600
