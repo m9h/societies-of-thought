@@ -165,6 +165,22 @@ def status() -> None:
             print(f"\n  ssh root@{port['ip']} -p {port['publicPort']} -i ~/.ssh/id_ed25519\n")
 
 
+def balance() -> None:
+    """Credit remaining, and every pod on the account -- including ones this checkout
+    has no state file for. A silently-running pod billed 14 hours once; `status` cannot
+    see a pod it did not launch, and `balance` can."""
+    me = gql("query { myself { clientBalance pods { id name desiredStatus costPerHr } } }")["myself"]
+    pods = me.get("pods") or []
+    burn = sum(float(p.get("costPerHr") or 0)
+               for p in pods if p.get("desiredStatus") == "RUNNING")
+    print(f"balance ${me['clientBalance']:.2f}   {len(pods)} pod(s)   "
+          f"burning ${burn:.2f}/hr")
+    for p in pods:
+        print(f"  {p['id']}  {p['name']}  {p['desiredStatus']}  ${p['costPerHr']}/hr")
+    if not pods:
+        print("  (none -- nothing is billing)")
+
+
 def down() -> None:
     if not STATE.exists():
         raise SystemExit("no pod recorded")
@@ -176,4 +192,4 @@ def down() -> None:
 
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "status"
-    {"up": up, "status": status, "down": down}.get(cmd, status)()
+    {"up": up, "status": status, "down": down, "balance": balance}.get(cmd, status)()
