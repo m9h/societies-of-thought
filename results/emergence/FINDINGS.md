@@ -61,41 +61,45 @@ same class of claim.
 
 `rl/judge.py` implements the LLM-as-judge with the paper's four behaviours and its
 counting convention (*"integer counts, 0 if none are present"*). Stratified sample, 25
-traces per bin, 245 judged of 250 (5 judge failures, never counted as zeros):
+traces per bin, **250 judged, 0 failures**, on traces with the scorer's debug echo removed
+(see §4.3):
 
 | steps | Q&A | shift | conflict | reconciliation | **n_personas** |
 |---|---|---|---|---|---|
-| 1–23 | 0.561 | 0.236 | 0.000 | 0.000 | **1.00** |
-| 25–49 | 0.449 | 0.395 | 0.162 | 0.108 | **1.00** |
-| 50–72 | 0.232 | 0.372 | 0.070 | 0.023 | **1.00** |
-| 73–97 | 0.288 | 0.138 | 0.013 | 0.038 | **1.00** |
-| 98–119 | 0.250 | 0.198 | 0.063 | 0.010 | **1.00** |
-| 120–141 | 0.299 | 0.041 | 0.000 | 0.000 | **1.00** |
-| 142–165 | 0.249 | 0.102 | 0.011 | 0.045 | **1.00** |
-| 166–187 | 0.286 | 0.037 | 0.012 | 0.012 | **1.00** |
-| 188–209 | 0.363 | 0.102 | 0.015 | 0.015 | **1.00** |
-| 210–232 | 0.262 | 0.060 | 0.000 | 0.000 | **1.00** |
+| 1–23 | 0.810 | 0.463 | 0.000 | 0.000 | **1.00** |
+| 25–49 | 0.512 | 0.845 | 0.178 | 0.133 | **1.00** |
+| 50–72 | 0.239 | 0.455 | 0.193 | 0.046 | **1.00** |
+| 73–97 | 0.320 | 0.439 | 0.093 | 0.053 | **1.00** |
+| 98–119 | 0.254 | 0.069 | 0.000 | 0.000 | **1.00** |
+| 120–141 | 0.351 | 0.198 | 0.000 | 0.015 | **1.00** |
+| 142–165 | 0.288 | 0.163 | 0.013 | 0.038 | **1.00** |
+| 166–187 | 0.293 | 0.056 | 0.000 | 0.000 | **1.00** |
+| 188–209 | 0.394 | 0.181 | 0.000 | 0.000 | **1.00** |
+| 210–232 | 0.251 | 0.172 | 0.000 | 0.013 | **1.00** |
 
-**`n_personas` is 1.00 in all ten bins.** Not a mean pulled down by outliers — no judged
-trace in the run was scored above one perspective. Conflict of perspectives peaks at 0.162
-early and ends at 0.000. Perspective shift *falls*, 0.236 → 0.060. Question–answering
-falls, 0.561 → 0.262. **Nothing rises.**
+**Every one of the 250 traces scored `n_personas = 1`.** Not a mean pulled down by
+outliers — the distribution is `{1: 250}`. Conflict of perspectives is exactly zero in six
+of ten bins and zero in the last. Question–answering *falls*, 0.810 → 0.251. Perspective
+shift *falls*, 0.463 → 0.172. **Nothing rises.**
 
-Side by side with the marker proxy on the identical traces:
+A second judge (a different model, same prompt, 100 traces) returns `n_personas = 1.00` in
+every bin as well.
 
-| steps | proxy conflict | single-string share | judge conflict |
-|---|---|---|---|
-| 1–23 | 0.085 | (3 matches) | 0.000 |
-| 50–72 | 1.086 | 35% | 0.070 |
-| 98–119 | 2.721 | **99%** | 0.063 |
-| 166–187 | 1.566 | **100%** | 0.012 |
-| 210–232 | **2.976** | **100%** | **0.000** |
+### §4.3 A contaminant that was working against this null
 
-The proxy reports a 35× rise. The judge reports zero. As the proxy's number grows, the
-share of it coming from one repeated string grows with it, reaching 100%.
+verl's Countdown scorer echoes each graded rollout back to stdout as
+`Target: … / Extracted equation: … / Solution string: <the whole prompt>`, and that block
+lands *after* the response and *before* the next prompt. The first parser ran to the next
+`User:` and swallowed it — **78% of traces carried ~45 words of it**, including the literal
+phrase *"A conversation between User and Assistant."*
 
-*(Dominance is only interpretable once there are enough matches to divide: the first bin's
-"100%" comes from three matches total and means nothing. Report it with the count.)*
+That inflated every word denominator, and it handed the judge a sentence that biases a
+persona count toward two. The judge answered 1.00 anyway. So the null survived a
+contaminant pushing against it, and the table above is recomputed from clean text.
+
+Separately, the judge's token budget was raised 300 → 1200. At 300 a more verbose judge
+spent its budget on preamble and never reached its JSON, failing on 74% of traces — and
+since failures rise with trace length, the budget was itself a length artifact.
 
 ### The two instruments agree on three behaviours out of four
 
@@ -105,13 +109,13 @@ not: over the ten bins, per behaviour,
 
 | behaviour | judge, first → last | proxy, first → last | same direction? | r |
 |---|---|---|---|---|
-| question_answering | 0.561 → 0.262 | 0.028 → 0.000 | **yes** | +0.60 |
-| perspective_shift | 0.236 → 0.060 | 0.085 → 0.000 | **yes** | **+0.90** |
-| **conflict_of_perspectives** | 0.000 → 0.000 | 0.085 → **2.976** | **no** | **−0.39** |
-| reconciliation | ~0, flat | ~0.35, flat | both flat | +0.79 |
+| question_answering | 0.810 → 0.251 | 0.039 → 0.000 | **yes** | **+0.75** |
+| perspective_shift | 0.463 → 0.172 | 0.116 → 0.000 | **yes** | **+0.83** |
+| **conflict_of_perspectives** | 0.000 → 0.000 | 0.116 → **3.373** | **no** | **−0.53** |
+| reconciliation | ~0 | 0.540 → 0.397 | levels differ | +0.88 |
 
-Perspective shift tracks at r = +0.90 across the run. Question–answering agrees in
-direction. Reconciliation is flat under both, at different levels. The instruments part
+Perspective shift tracks at r = +0.83 and question–answering at +0.75, both falling
+under both instruments. Reconciliation is flat under both, at different levels. The instruments part
 company on **exactly one** behaviour — the one whose marker count is 100% a single
 repeated string.
 
@@ -156,7 +160,7 @@ and prompt version, so two instruments cannot be silently mixed inside one curve
 - **Persona extraction.** The paper's judge characterises each perspective and answers
   BFI-10 items from its point of view. Ours returns a count. A richer procedure could
   segment a trace we score as one voice.
-- **n = 13–15 per control set**; 245 traces judged in the main table, 25 per bin.
+- **n = 13–15 per control set**; 250 traces judged in the main table, 25 per bin, 0 failures.
 - **Countdown.** Arithmetic search by a 3B base model is the paper's own choice of task
   for this figure, but it is not where dialogue would be most expected.
 
