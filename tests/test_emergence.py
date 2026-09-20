@@ -118,3 +118,44 @@ def test_behaviours_per_step_reports_n_so_thin_bins_are_visible():
 
 def test_empty_log_yields_no_rollouts_rather_than_crashing():
     assert parse_rollouts("nothing here\n") == []
+
+
+# --- the other two behaviours the paper names -------------------------------
+
+
+def test_all_four_paper_behaviours_have_a_proxy():
+    """The paper names four. Measuring two and reporting on Fig. 4b would be reporting
+    on half their instrument."""
+    from analysis.emergence import BEHAVIOUR_FNS
+    from rl.judge import BEHAVIOURS
+    assert set(BEHAVIOUR_FNS) == set(BEHAVIOURS)
+
+
+def test_perspective_shift_counts_transitions_not_segments():
+    """N segments means N-1 transitions. Reporting the segment count would give a
+    single-voice trace a shift count of one."""
+    from analysis.emergence import perspective_shift
+    assert perspective_shift("A single steady line of reasoning that never turns.") == 0
+
+
+def test_perspective_shift_rises_with_added_turns():
+    from analysis.emergence import perspective_shift
+    one = ("Let me try adding the two largest numbers together first and see how close "
+           "that gets us to the target value we need.")
+    two = one + (" However, that overshoots the target by quite a lot, so a different "
+                 "combination is needed here instead.")
+    assert perspective_shift(two) > perspective_shift(one)
+
+
+def test_reconciliation_needs_an_integration_not_just_a_conclusion():
+    from analysis.emergence import reconciliation
+    assert reconciliation("Combining both approaches, the answer is 51.") > 0
+    assert reconciliation("The answer is 51.") == 0
+
+
+def test_behaviours_per_step_reports_a_rate_for_each_of_the_four():
+    rs = [{"step": 1, "prompt": "p", "response": "Wait, no. Combining both, it works."}]
+    out = behaviours_per_step(rs)[1]
+    for b in ("question_answering", "perspective_shift",
+              "conflict_of_perspectives", "reconciliation"):
+        assert f"{b}_rate" in out, f"no rate reported for {b}"

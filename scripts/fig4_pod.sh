@@ -54,8 +54,27 @@ fi
 [ -d "$REPO_DIR/.git" ] || git clone -q https://github.com/m9h/societies-of-thought.git "$REPO_DIR"
 [ -d "$TZ/.git" ]       || git clone -q https://github.com/Jiayi-Pan/TinyZero.git "$TZ"
 cd "$REPO_DIR" && git fetch -q origin && git checkout -q "${BRANCH:-analysis/ddm-pilot}" && git pull -q || true
-"$PY" -c "import verl" 2>/dev/null || (cd "$TZ" && "$PY" -m pip install -q -e .)
-"$PY" -c "import pandas, pyarrow" 2>/dev/null || "$PY" -m pip install -q pandas pyarrow
+# pip >= 24.1 rejects the invalid metadata in the old uvicorn wheels that TinyZero's
+# `vllm<=0.6.3` pin drags in ("click (>=7.*)" -- a .* suffix with >=). The resolver then
+# fails the whole verl install. pip itself says the fix: use pip<24.1.
+if ! "$PY" -c "import verl" 2>/dev/null; then
+  "$PY" - <<'PYEOF' || "$PY" -m pip install -q "pip<24.1"
+import sys
+from importlib.metadata import version
+sys.exit(0 if tuple(int(x) for x in version("pip").split(".")[:2]) < (24, 1) else 1)
+PYEOF
+  (cd "$TZ" && "$PY" -m pip install -q -e .)
+fi
+# FAIL HERE, not three steps later. Without this the run continued into a data build
+# that could not work, and the first symptom was a missing parquet -- which reads like a
+# data bug rather than a failed dependency install.
+"$PY" -c "import verl" 2>/dev/null \
+  || { echo "verl did NOT install -- PPO cannot run. Tail of the pip output above." >&2; exit 1; }
+# `datasets` is what TinyZero's countdown preprocessor imports. It arrives as a verl
+# dependency when that install succeeds, and its absence is how a failed verl install
+# first became visible. Name it explicitly so the dependency is not implicit.
+"$PY" -c "import pandas, pyarrow, datasets" 2>/dev/null \
+  || "$PY" -m pip install -q pandas pyarrow datasets
 if ! "$PY" -c "import flash_attn" 2>/dev/null; then
   echo "$(date -Is) installing flash-attn (required by verl PPO) ..."
   "$PY" -m pip install -q ninja
@@ -79,6 +98,9 @@ for split in ("train", "test"):
 PYEOF
   cp "$DATA/_base_test.parquet" "$DATA/test.parquet"   # the eval set is shared, unpermuted
 fi
+for f in _base_train.parquet test.parquet; do
+  [ -s "$DATA/$f" ] || { echo "data build produced no $f -- see the errors above" >&2; exit 1; }
+done
 "$PY" -m rl.run_seed "$DATA/_base_train.parquet" "$DATA/train_s${SEED}.parquet" --seed "$SEED"
 
 # --- 3. smoke gate: fail cheap ---------------------------------------------------

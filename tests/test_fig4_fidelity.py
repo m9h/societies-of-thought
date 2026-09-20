@@ -130,3 +130,27 @@ def test_the_run_refuses_to_start_without_a_way_to_save_the_traces():
 def test_ppo_checkpoints_are_still_disabled_by_default():
     """~16GB each; three arms once filled a 200GB disk mid-save."""
     assert 'trainer.save_freq="${SAVE_FREQ:--1}"' in _text()
+
+
+# --- the dependency chain has to fail where it breaks ------------------------
+
+
+def test_a_failed_verl_install_stops_the_run():
+    """verl's install failed once and the script marched on into a data build that
+    could not work. The first visible symptom was a missing parquet, which reads like a
+    data bug rather than a failed dependency install."""
+    t = _text()
+    assert "verl did NOT install" in t
+    assert t.index("verl did NOT install") < t.index("building data"), \
+        "the verl check must come before the data build it gates"
+
+
+def test_pip_is_downgraded_for_the_tinyzero_pin():
+    """pip >= 24.1 rejects the old uvicorn wheel metadata that `vllm<=0.6.3` pulls in,
+    and fails the whole verl install with warnings that look cosmetic."""
+    assert '"pip<24.1"' in _text()
+
+
+def test_the_data_build_verifies_its_own_output():
+    t = _text()
+    assert "data build produced no" in t

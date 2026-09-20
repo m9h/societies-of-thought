@@ -24,6 +24,8 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 
+from analysis.hse import segment
+
 _ANSI = re.compile(r"\x1b\[[0-9;]*m")
 _RAY = re.compile(r"\((?:main_task|WorkerDict|raylet|pid=)[^)]*\)\s?")
 _STEP = re.compile(r"^step:(\d+)\s*-")
@@ -102,6 +104,39 @@ def conflict_of_perspectives(text: str) -> int:
     return len(_CONFLICT.findall(text))
 
 
+# "Reconciliation": conflicting views integrated into a synthesis. A bare conclusion
+# ("the answer is 51") is not one -- every trace ends in a conclusion, so counting those
+# would make the measure track trace count rather than integration.
+_RECONCILE = re.compile(
+    r"\b(combin\w+|put(?:ting)? (?:it|them|these) together|taking (?:both|all) "
+    r"(?:of these|together)|reconcil\w+|on balance|either way|both (?:approaches|ideas|"
+    r"ways) (?:agree|lead|give)|so (?:overall|in the end)|that (?:settles|resolves) it|"
+    r"which confirms|consistent with (?:both|the earlier))\b", re.I)
+
+
+def perspective_shift(text: str) -> int:
+    """Count transitions between perspectives.
+
+    N segments means N-1 transitions: a trace in one steady voice has shifted zero times.
+    Reusing `analysis.hse.segment` keeps this measure identical to the one the diversity
+    work uses, so the two analyses cannot silently drift apart.
+    """
+    return max(len(segment(text)) - 1, 0)
+
+
+def reconciliation(text: str) -> int:
+    """Count explicit integrations of conflicting views."""
+    return len(_RECONCILE.findall(text))
+
+
+BEHAVIOUR_FNS = {
+    "question_answering": question_answering,
+    "perspective_shift": perspective_shift,
+    "conflict_of_perspectives": conflict_of_perspectives,
+    "reconciliation": reconciliation,
+}
+
+
 def behaviours_per_step(rollouts) -> dict[int, dict]:
     """Per-step behaviour rates per 100 words, plus bin size and mean length."""
     by = defaultdict(list)
@@ -111,16 +146,20 @@ def behaviours_per_step(rollouts) -> dict[int, dict]:
     out = {}
     for step, rs in sorted(by.items()):
         words = [max(len(r["response"].split()), 1) for r in rs]
-        qa = [question_answering(r["response"]) for r in rs]
-        cf = [conflict_of_perspectives(r["response"]) for r in rs]
         tw = sum(words)
-        out[step] = {
+        rec = {
             "n": len(rs),
             "words": tw / len(rs),
-            "qa_rate": 100.0 * sum(qa) / tw,
-            "conflict_rate": 100.0 * sum(cf) / tw,
-            "qa_per_trace": sum(qa) / len(rs),
-            "conflict_per_trace": sum(cf) / len(rs),
             "think_blocks": sum(r["response"].count("<think>") for r in rs) / len(rs),
         }
+        for name, fn in BEHAVIOUR_FNS.items():
+            counts = [fn(r["response"]) for r in rs]
+            rec[f"{name}_rate"] = 100.0 * sum(counts) / tw
+            rec[f"{name}_per_trace"] = sum(counts) / len(rs)
+        # Short aliases kept for the two behaviours the first pass measured.
+        rec["qa_rate"] = rec["question_answering_rate"]
+        rec["conflict_rate"] = rec["conflict_of_perspectives_rate"]
+        rec["qa_per_trace"] = rec["question_answering_per_trace"]
+        rec["conflict_per_trace"] = rec["conflict_of_perspectives_per_trace"]
+        out[step] = rec
     return out
