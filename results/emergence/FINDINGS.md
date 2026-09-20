@@ -97,6 +97,28 @@ share of it coming from one repeated string grows with it, reaching 100%.
 *(Dominance is only interpretable once there are enough matches to divide: the first bin's
 "100%" comes from three matches total and means nothing. Report it with the count.)*
 
+### The two instruments agree on three behaviours out of four
+
+This is the part that makes the disagreement worth taking seriously. If judge and proxy
+simply measured different things, neither would be informative about the other. They do
+not: over the ten bins, per behaviour,
+
+| behaviour | judge, first → last | proxy, first → last | same direction? | r |
+|---|---|---|---|---|
+| question_answering | 0.561 → 0.262 | 0.028 → 0.000 | **yes** | +0.60 |
+| perspective_shift | 0.236 → 0.060 | 0.085 → 0.000 | **yes** | **+0.90** |
+| **conflict_of_perspectives** | 0.000 → 0.000 | 0.085 → **2.976** | **no** | **−0.39** |
+| reconciliation | ~0, flat | ~0.35, flat | both flat | +0.79 |
+
+Perspective shift tracks at r = +0.90 across the run. Question–answering agrees in
+direction. Reconciliation is flat under both, at different levels. The instruments part
+company on **exactly one** behaviour — the one whose marker count is 100% a single
+repeated string.
+
+That is a surgical result rather than a nihilistic one. Marker counting is not useless
+here; it fails on one pattern, for a reason that is visible in the decomposition, and the
+failure happens to land on the behaviour Fig. 4's headline rests on.
+
 ### The control that makes this credible
 
 A judge that always answers 1 would produce this table on any input. It does not:

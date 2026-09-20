@@ -139,6 +139,20 @@ input.** Same judge, same prompt, same session:
 It finds ~3 personas when personas are there, in every trace. On late-RL traces it finds
 one, and the whole row is indistinguishable from the known-monologue corpus.
 
+**And the two instruments agree on three of your four behaviours**, which is why we think
+the fourth is worth your attention rather than dismissible as judge noise:
+
+| behaviour | judge, first → last | markers, first → last | same direction? | r |
+|---|---|---|---|---|
+| question–answering | 0.561 → 0.262 | 0.028 → 0.000 | yes | +0.60 |
+| perspective shift | 0.236 → 0.060 | 0.085 → 0.000 | yes | **+0.90** |
+| **conflict of perspectives** | 0.000 → 0.000 | 0.085 → **2.976** | **no** | **−0.39** |
+| reconciliation | ~0, flat | ~0.35, flat | both flat | +0.79 |
+
+Perspective shift tracks at r = +0.90 across the whole run. The two instruments part
+company on exactly one behaviour, and it is the one whose marker count is 100% a single
+repeated string.
+
 Our honest summary: **on this run, the answer to Fig. 4 depends entirely on which
 instrument you use**, and we cannot tell from the paper which way yours would fall on a
 numbered enumeration of rejected candidates. That is a question only you can answer, and
