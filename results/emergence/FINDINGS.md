@@ -169,6 +169,56 @@ concentrate in late training, and a fail-open judge would manufacture precisely 
 decline being looked for. `parse_verdict` raises. The cache key carries both judge model
 and prompt version, so two instruments cannot be silently mixed inside one curve.
 
+## 4.5 The faithful config, mid-run (seed 0, step 166 of 250)
+
+The run in flight uses the paper's configuration — `rollout.n=4`, train batch 128,
+un-primed Qwen-2.5-3B, accuracy-only reward — and it is learning: validation on Countdown
+climbs 0.602 → 0.668 by step 166, landing where the C5 faithful run's baseline arm
+finished (0.661 at step 250).
+
+**Judge, 250 traces, 25 per bin, 0 failures:**
+
+| steps | Q&A | shift | conflict | reconciliation | **n_personas** |
+|---|---|---|---|---|---|
+| 0–16 | 0.618 | 0.545 | 0.254 | 0.036 | **1.00** |
+| 17–33 | 0.957 | 0.478 | 0.217 | 0.130 | **1.00** |
+| 34–50 | 0.520 | 0.565 | 0.045 | 0.090 | **1.00** |
+| 51–67 | 0.452 | 1.157 | 0.108 | 0.072 | **1.00** |
+| 68–84 | 0.303 | 0.389 | **0.000** | 0.058 | **1.00** |
+| 102–118 | 0.467 | 0.409 | **0.000** | 0.019 | **1.00** |
+| 135–150 | 0.545 | 0.981 | **0.000** | 0.044 | **1.00** |
+| 151–166 | 0.469 | 0.664 | **0.000** | 0.117 | **1.00** |
+
+Conflict of perspectives declines from 0.254 to **exactly zero from step 68 onward**.
+Perspective shift is noisy with no trend (0.31–1.16). Question–answering drifts down.
+Nothing emerges.
+
+**Across both runs: 500 traces judged, `n_personas` distribution `{1: 500}`.** Two
+configurations, two judge models, zero exceptions.
+
+### ⚠ Two cautions this run adds
+
+**A "rise then fall" was visible in the marker proxy and is NOT confirmed.** The proxy
+showed conflict nearly doubling to step ~40 then decaying — which is the dynamic a
+co-author predicted, citing Gandhi et al. The judge shows no rise at all over the same
+traces (0.254 → 0.217 → 0.045). It was not written up as a finding, and it should not be.
+
+**The proxy's agreement with the judge does not generalise.** On the `n=1` log the two
+instruments tracked on three behaviours of four (perspective shift r = +0.83). On the
+faithful run the correlations are ~0 across the board:
+
+| behaviour | r (n=1 log) | r (faithful run) |
+|---|---|---|
+| question_answering | +0.75 | **−0.13** |
+| perspective_shift | +0.83 | **+0.08** |
+| conflict_of_perspectives | −0.53 | +0.42 |
+| reconciliation | +0.88 | **−0.09** |
+
+So the earlier "they agree on three of four" was a property of that one log — plausibly
+because both instruments were watching the same collapse — not a general validation of
+marker counting. **Surface-marker behaviour rates should not be trusted on this question
+at all.** What survives across every cut is the judge's persona count, and it is 1.
+
 ## 5. Limits — read before quoting
 
 - **Config.** This log is `rollout.n=1`, train batch 256. The paper's is `n=4`, batch 128.
