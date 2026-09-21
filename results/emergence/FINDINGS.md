@@ -219,6 +219,63 @@ because both instruments were watching the same collapse — not a general valid
 marker counting. **Surface-marker behaviour rates should not be trusted on this question
 at all.** What survives across every cut is the judge's persona count, and it is 1.
 
+## 4.9 FINAL: the complete 250-step run on the paper's configuration
+
+*Seed 0 finished 2026-09-21. Un-primed Qwen-2.5-3B, PPO on Countdown, reward = accuracy
+only, `rollout.n=4`, train batch 128, 250 steps. 2,555 logged rollouts. Full log at
+`results/emergence/fig4_qwen_s0_FINAL.log.gz`.*
+
+**The run learned.** Countdown validation, every 10 steps:
+
+```
+0.104 0.114 0.188 0.233 0.261 0.341 0.403 0.418 0.463 0.523 0.578 0.602 0.628
+0.644 0.656 0.672 0.668 0.671 0.674 0.675 0.700 0.691 0.704 0.707 0.702 0.702
+```
+
+0.104 → **0.702**, peak 0.707. For reference the C5 faithful run's baseline arm finished at
+0.661. This is a healthy, converged RL run, not a failed one — which is what makes the
+behavioural null below worth anything.
+
+**Judge, 8 bins × 32 traces, 256 judged, 0 failures:**
+
+| steps | Q&A | shift | conflict | reconciliation | **n_personas** |
+|---|---|---|---|---|---|
+| 0–31 | 0.800 | 0.741 | 0.296 | 0.089 | **1.00** |
+| 32–63 | 0.403 | 0.681 | 0.222 | 0.083 | **1.00** |
+| 64–95 | 0.301 | 0.312 | 0.022 | 0.043 | **1.00** |
+| 96–126 | 0.400 | 0.426 | **0.000** | 0.040 | **1.00** |
+| 127–157 | 0.529 | 0.397 | **0.000** | 0.033 | **1.00** |
+| 158–188 | 0.493 | 0.385 | **0.000** | 0.062 | **1.00** |
+| 189–219 | 0.488 | 0.535 | **0.000** | 0.047 | **1.00** |
+| 220–250 | 0.473 | 0.458 | **0.000** | 0.059 | **1.00** |
+
+**All four behaviours decline across training. None rises.**
+
+- question–answering 0.800 → 0.473
+- perspective shift 0.741 → 0.458
+- conflict of perspectives 0.296 → **0.000**, and it is zero from step 96 onward
+- reconciliation 0.089 → 0.059, negligible throughout
+
+`n_personas` is 1.00 in every bin. **Across all four judged runs: 861 traces, 0 failures,
+distribution `{1: 861}`.**
+
+### One thing that only a deeper sample caught
+
+At 15 traces per bin, perspective shift appeared to *rise* (0.692 → 0.975) and an earlier
+draft of this section said so. At 32 per bin it declines (0.741 → 0.458). The apparent rise
+was sampling noise in a rate computed over ~150 words per trace. **Do not read a per-bin
+trend off n = 15 here.** Four of this project's errors have now been small-sample or
+filtering artifacts that produced a clean-looking trend.
+
+### The marker proxy is not usable on this question
+
+On the same 256 traces the proxy reports perspective shift going 0.207 → 0.000 — a total
+collapse where the judge sees a 38% decline — and reconciliation flat at ~0.6 where the
+judge sees 0.06. Correlations against the judge across bins are ~0 or negative
+(reconciliation r = −0.86). Taken with §4.5, surface-marker behaviour rates have now
+disagreed with the judge on every configuration tested, in both directions and by up to two
+orders of magnitude. **Report the judge; do not report marker rates.**
+
 ## 5. Limits — read before quoting
 
 - **Config.** This log is `rollout.n=1`, train batch 256. The paper's is `n=4`, batch 128.
