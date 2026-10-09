@@ -278,17 +278,24 @@ orders of magnitude. **Report the judge; do not report marker rates.**
 
 ## 5. Limits — read before quoting
 
-- **Config.** This log is `rollout.n=1`, train batch 256. The paper's is `n=4`, batch 128.
-  The faithful run is in flight (`scripts/fig4_pod.sh`).
-- **One run.** No seeds. A co-author has told us the RL results are seed-sensitive and
-  that they are running multi-seed for the revision; three seeds are queued here.
+- **Config.** §2–4 are on the claimA log (`rollout.n=1`, train batch 256). §4.5 and §4.9
+  are on the paper's configuration (`n=4`, batch 128, `scripts/fig4_pod.sh`), complete at
+  250 steps. The answer did not change between them.
+- **One seed.** A co-author has told us the RL results are seed-sensitive and that they
+  are running multi-seed for the revision. Two more seeds are costed (~$140) and sit
+  below instrument validation in `docs/ROADMAP.md`: a seeded result on an unvalidated
+  judge is a more precise version of the same uncertainty.
 - **Judge identity.** The paper judges with Gemini-2.5-Pro; we judge with an Anthropic
   model. Their reported cross-judge ICC(3,1) ≈ .85 is why this is a declarable deviation
-  rather than a different experiment — but it is a deviation.
+  rather than a different experiment — but it is a deviation, and Norman et al. (§7) show
+  that agreement of that size coexists with large judge-specific bias. Our own null rested
+  on one model family until §4.10; it still rests on one *vendor's* models, because no
+  second-family key is available here. `rl/judge.py` takes `gemini/…` or `openai/…` specs
+  the moment one is.
 - **Persona extraction.** The paper's judge characterises each perspective and answers
   BFI-10 items from its point of view. Ours returns a count. A richer procedure could
   segment a trace we score as one voice.
-- **n = 13–15 per control set**; 250 traces judged in the main table, 25 per bin, 0 failures.
+- **n = 13–15 per control set**; 861 traces judged across all tables, 0 failures.
 - **Countdown.** Arithmetic search by a 3B base model is the paper's own choice of task
   for this figure, but it is not where dialogue would be most expected.
 
@@ -301,3 +308,33 @@ orders of magnitude. **Report the judge; do not report marker rates.**
    number would tell us immediately whether we are measuring the same thing.
 3. Does the judge see a *conflict of perspectives* in a numbered enumeration of rejected
    candidates? Ours does not; a judge that did would reproduce the marker-count curve.
+
+## 7. Reading this result after the 2026 H2 literature
+
+Full review in `docs/literature_2026_H2.md`. Four things change how §4–6 should be read.
+
+1. **Judge-dependence is now a documented, quantified phenomenon, not our suspicion.**
+   Norman, Rivera & Hughes (arXiv 2606.19544; 21 judges, 541k judgments) find 33–41 point
+   deflation from exact match to Cohen's κ, judge rankings that move up to 14 positions
+   across benchmarks, and production judges with test–retest > .95 *and* position bias >
+   .10 — reliability without validity. Yang, Hou & Yang (2607.08535): a judge score "can
+   move even when the candidate responses stay fixed, simply because the evaluator has
+   changed." In that vocabulary the paper's ICC ≈ .85 is a *reliability* number, and Fig.
+   4b/4e are an instrument reading with an unpublished instrument. The same standard
+   applies to us, which is why §4.10 exists and why every table from here reports κ and
+   ICC rather than exact match.
+2. **A concession.** Boppana et al. (2603.05488, "Reasoning Theater") show that discourse
+   inflection points — backtracking, "wait" — "occur almost exclusively in responses where
+   probes show large belief shifts." Markers track internal state. The "markers are exhaust"
+   reading this document has leaned toward is too strong, and we withdraw it in that form.
+   What survives is narrower: the *dialogic* reading (distinct personas in conflict) does
+   not reproduce under the paper's own instrument. Whether persona boundaries coincide
+   with probe-detected belief shifts is a judge-free test and is the roadmap's Tier 2.
+3. **The decline is a regularity, not an anomaly.** RL fine-tuning reduces chain-of-thought
+   faithfulness and narrative structure over training in several independent reports
+   (2602.12506, 2605.24286, 2607.23458), sometimes rise-then-fall. A behaviour curve that
+   falls under accuracy-only RL on Countdown is the expected shape, which makes the paper's
+   rising curve the thing that needs an explanation rather than ours.
+4. **The C5 mechanism has a name.** Krishnamurthy, Huang & Rajaraman (2606.13125) describe
+   strategy selection via SFT on diverse strategies as a post-training mechanism; it is
+   the theory-side label for "priming installs the contract."

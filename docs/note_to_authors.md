@@ -167,6 +167,21 @@ point of view, where ours returns a count — a richer procedure might segment a
 score as one voice. The faithful config is running now, three seeds, and we will send the
 numbers either way.
 
+### A note on judges, since the field has moved
+
+Two papers that appeared after yours bear directly on Fig. 4. Norman, Rivera & Hughes
+(arXiv 2606.19544; 21 judges, 541k judgments) find that exact-match agreement overstates
+chance-corrected agreement by 33–41 points, that judge rankings shift by up to 14 positions
+across benchmarks, and that judges with test–retest above .95 can carry position bias above
+.10 — "reliability without validity". Yang, Hou & Yang (2607.08535) put it in one line: a
+judge score can move when only the evaluator changes. None of this says your ICC ≈ .85 is
+wrong; it says it is a reliability number, and that the published prompt is the part of the
+instrument a reader needs. We have re-scored our own Fig. 4 sample with a second and third
+judge and report chance-corrected agreement (κ, ICC) rather than exact match; the one thing
+we cannot do without a key is reach a second model *family*, and if you were able to share
+Gemini-2.5-Pro's verdicts on even a dozen of our traces we would know within the hour
+whether the disagreement is the judge.
+
 ## 5. On seeds — you're right, and here's exactly how far ours reaches
 
 Ours is **n=1 per arm**. So we can't and don't claim your Fig. 8 result fails to replicate.

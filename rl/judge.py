@@ -178,3 +178,106 @@ def anthropic_backend(model: str = "claude-opus-5", max_tokens: int = 1200):
         return "".join(b.text for b in msg.content if b.type == "text")
 
     return call
+
+
+# --------------------------------------------------------------------------------------
+# Other judge families.
+#
+# Norman, Rivera & Hughes (arXiv 2606.19544) and Yang, Hou & Yang (2607.08535) formalise
+# what this project found by hand: a judge score can move with the judge alone. A null
+# that rests on one model family is therefore only half a result. The providers below all
+# speak the OpenAI chat-completions dialect, so one backend covers Google, OpenAI and the
+# aggregators; the key is looked up at construction so a missing key fails before the
+# first trace, not as a 401 in the middle of a 256-call run.
+# --------------------------------------------------------------------------------------
+
+_PROVIDERS = {
+    # provider: (base_url, env var, family, token-limit parameter name)
+    "gemini": ("https://generativelanguage.googleapis.com/v1beta/openai",
+               "GEMINI_API_KEY", "google", "max_tokens"),
+    "openai": ("https://api.openai.com/v1", "OPENAI_API_KEY", "openai",
+               "max_completion_tokens"),
+    "openrouter": ("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY", "openrouter",
+                   "max_tokens"),
+    "nim": ("https://integrate.api.nvidia.com/v1", "NGC_API_KEY", "nvidia", "max_tokens"),
+}
+
+_FAMILY_PATTERNS = (
+    (r"^claude", "anthropic"), (r"^gemini|^gemma", "google"), (r"^gpt|^o[0-9]", "openai"),
+    (r"llama", "meta"), (r"mistral|mixtral", "mistral"), (r"deepseek", "deepseek"),
+    (r"qwen", "alibaba"), (r"kimi", "moonshot"), (r"glm", "zhipu"),
+)
+
+
+def family_of(model_tag: str) -> str:
+    """Which model family a judge tag belongs to; 'unknown' rather than a guess."""
+    t = model_tag.lower().split("/")[-1]
+    for pat, fam in _FAMILY_PATTERNS:
+        if re.search(pat, t):
+            return fam
+    return "unknown"
+
+
+def _post_json(url: str, headers: dict, payload: dict) -> dict:
+    import urllib.request
+    req = urllib.request.Request(
+        url, data=json.dumps(payload).encode(), method="POST",
+        headers={"Content-Type": "application/json", **headers})
+    with urllib.request.urlopen(req, timeout=180) as resp:
+        return json.loads(resp.read().decode())
+
+
+def openai_compatible_backend(model: str, base_url: str, api_key: str,
+                              max_tokens: int = 1200, temperature=0,
+                              token_param: str = "max_tokens", _post=None):
+    """A judge backend for any OpenAI-chat-compatible endpoint (Gemini, OpenAI, NIM...).
+
+    temperature=0 by default: a judge is a measurement, not a sample. (The Anthropic
+    backend above runs at the API default because the published cache was built that
+    way; changing it would change the instrument mid-study.) Pass temperature=None to
+    omit the field for models that reject it.
+    """
+    post = _post or _post_json
+    url = base_url.rstrip("/") + "/chat/completions"
+    headers = {"Authorization": f"Bearer {api_key}"}
+
+    def call(prompt: str) -> str:
+        payload = {"model": model, token_param: max_tokens,
+                   "messages": [{"role": "user", "content": prompt}]}
+        if temperature is not None:
+            payload["temperature"] = temperature
+        out = post(url, headers, payload)
+        if "error" in out:
+            raise RuntimeError(f"{model}: {out['error']}")
+        try:
+            return out["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as e:
+            raise RuntimeError(f"{model}: malformed completion {str(out)[:200]!r}") from e
+
+    return call
+
+
+def make_backend(spec: str, max_tokens: int = 1200):
+    """`provider/model` -> (callable, cache tag, family).
+
+    A bare model name is Anthropic. The cache tag is the model id alone, so the cache
+    key does not change if the same model is reached through a different provider.
+    """
+    provider, _, model = spec.partition("/")
+    if not model:
+        provider, model = "anthropic", spec
+    if provider == "anthropic":
+        if "ANTHROPIC_API_KEY" not in os.environ:
+            raise RuntimeError("ANTHROPIC_API_KEY is not set")
+        return anthropic_backend(model, max_tokens=max_tokens), model, "anthropic"
+    if provider not in _PROVIDERS:
+        raise ValueError(f"unknown provider {provider!r}; known: "
+                         f"anthropic, {', '.join(_PROVIDERS)}")
+    base_url, env, fam, token_param = _PROVIDERS[provider]
+    if env not in os.environ:
+        raise RuntimeError(f"{env} is not set (needed for provider {provider!r})")
+    temperature = None if provider == "openai" else 0
+    call = openai_compatible_backend(model, base_url, os.environ[env], max_tokens=max_tokens,
+                                     temperature=temperature, token_param=token_param)
+    fam = fam if fam not in ("openrouter", "nvidia") else family_of(model)
+    return call, model.split("/")[-1], fam
