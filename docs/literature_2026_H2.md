@@ -1,6 +1,6 @@
 # Literature review, 2026 H2 — and what it does to this project
 
-*Written 2026-10-06. Every paper below **post-dates** arXiv:2601.10825 (15 Jan 2026), which
+*Written 2026-10-06; §1 opening corrected 2026-10-08 (the paper's prompts are published, and under them Fig. 4 reproduces — see FINDINGS §4.11, which makes the validity framing below sharper, not weaker). Every paper below **post-dates** arXiv:2601.10825 (15 Jan 2026), which
 is still at **v1** with no code, no data and no journal reference. A co-author told us in
 September that code ships with the revised version. That has not happened, so our window is
 still open.*
@@ -10,7 +10,8 @@ still open.*
 ## 1. The field formalised our central claim, at scale, after the paper came out
 
 Our strongest result is methodological: Fig. 4's answer depends on which instrument you
-use, and the instrument is an unpublished LLM-judge prompt. Two papers now establish that
+use, and the instrument is an LLM-judge prompt (published in the v1 supplement — an earlier
+version of this document said otherwise; see `results/emergence/FINDINGS.md` §4.10). Two papers now establish that
 as a general property of LLM judges, with far more data than we have.
 
 **Norman, Rivera & Hughes, "Reliability without Validity" ([2606.19544](https://arxiv.org/abs/2606.19544), 17 Jun 2026).**

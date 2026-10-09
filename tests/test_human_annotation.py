@@ -14,7 +14,7 @@ import random
 import pytest
 
 from analysis.human_annotation import score_ratings, select_traces, write_sheet
-from rl.judge import BEHAVIOURS, DEFINITIONS
+from rl.judge import BEHAVIOURS
 
 FIELDS = (*BEHAVIOURS, "n_personas")
 
@@ -43,9 +43,13 @@ def test_sheet_is_blind(tmp_path):
     sel = select_traces(_judged(), n=50, seed=1)
     paths = write_sheet(sel, tmp_path)
     sheet = (tmp_path / "sheet.md").read_text()
-    for f in FIELDS:
-        assert f.replace("_", " ") in sheet            # the definitions are there
-        assert DEFINITIONS.get(f, "x") in sheet or f == "n_personas"
+    for phrase in ("A question is posed and later answered, as in conversations.",
+                   "A transition to a different idea, viewpoint, assumption, or approach",
+                   "Expressions of disagreement, correction, or tension with another perspective.",
+                   "Conflicting views are integrated or resolved into a coherent synthesis.",
+                   "identify the number of distinct perspectives (agents or voices)",
+                   "Transitional markers"):
+        assert phrase in sheet, phrase                 # the paper's definitions, verbatim
     assert "step" not in sheet.lower().replace("step-by-step", "")
     assert "judge" not in sheet.lower()
     # verdict numbers must not leak: the sheet carries ids and traces only

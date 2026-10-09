@@ -102,11 +102,14 @@ trace goes. Note that the persona prompt lists transitional markers ("however," 
 
 ## Headline, for orientation only
 
-On this run the judge found `n_personas = 1` on every one of 861 traces across all
-subsamples, and conflict of perspectives at zero from step 96 onward, while the run learned
-normally. The same judge scores the paper's own dialogue-primed corpus at 2.9 personas on
-average (>1 on 93% of traces) and a monologue corpus at 1.0. Read `results/emergence/FINDINGS.md`
-before quoting; §5 lists the limits.
+Under the paper's prompts verbatim, with two judges, conflict of perspectives rises from
+about 1 to 8–10 per trace over training and the persona count from 1.3 to 1.8, on both
+series: Fig. 4b/4e reproduce. Judge-free, the same traces contain no question marks, the
+"conflicts" are `(not N)` rejection lines of an arithmetic enumeration, the second
+"persona" is always the answer-presentation role, and the pronoun "we" goes from 100% of
+traces to 0%. An earlier paraphrased prompt (`v1`, 861 verdicts) found no rise and one
+persona everywhere; those verdicts are keyed to a previous parse of the responses and are
+not included here. Read `results/emergence/FINDINGS.md` §4.10–4.11 before quoting.
 
 ## Citation
 

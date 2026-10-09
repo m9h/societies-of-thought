@@ -19,7 +19,7 @@ Qwen-2.5-3B, PPO on Countdown, 250 steps). That is what our attendee was describ
 
 **Fig. 4** (base model developing conversational behaviour under accuracy-only reward) —
 which is what you guessed, and you were right that we had looked at it. We had, in July,
-and we have now redone it properly with your instrument rather than ours. See §4; it is
+and we have now redone it with your instrument, verbatim, rather than ours. See §4; it is
 the part we would most like you to push back on.
 
 We also ran the feature-30939 steering effect and the perspective-diversity ↔ correctness
@@ -92,95 +92,66 @@ per se.
 across 6 samples at T=0.6. Independence would predict ~94% mixed; we see 22%. Per-problem
 accuracy is bimodal, not binomial, which matters for how any per-trace analysis is powered.)
 
-## 4. Fig. 4: two instruments, two different answers
+## 4. Fig. 4: your instrument reproduces your curves — and here is what it is counting
 
-We ran the un-primed arm — Qwen-2.5-3B base, PPO on Countdown, reward = accuracy only,
-232 steps, 1,099 logged rollouts — and measured the behaviour frequency two ways.
+We ran your Fig. 4 configuration exactly (Qwen-2.5-3B base, PPO, accuracy-only reward,
+`rollout.n=4`, batch 128, 250 steps; val reward 0.104 → 0.702) and scored the traces with
+**your two judge prompts verbatim** from the v1 Supplementary Methods — the behaviour counts
+and the persona identification with BFI-10 — using two judges (Claude Sonnet 5, Claude
+Haiku 4.5; Claude Opus 5 refused the prompt on every call). We scored two series: the
+held-out validation generations at every 10th step, which your Methods say Fig. 4b is
+measured on, and the on-policy training rollouts. Both give the same picture.
 
-**By counting surface markers, your result replicates and then some.** Conflict of
-perspectives rises 12× across training, as a rate per 100 words rather than a per-trace
-count, so it is not the length increase (166 → 357 words).
+**Your result reproduces.** On the validation series, mean count per trace, first bin
+(steps 0–30) → last bin (230–250):
 
-**We do not believe that number, and here is why.** Decomposing the matches by which
-string produced them: in late training, **2,090 of 2,095 — 99.8% — are the single phrase
-"doesn't equal"**, emitted once per line of a numbered enumeration:
+| | Sonnet 5 | Haiku 4.5 |
+|---|---|---|
+| conflict of perspectives | 1.4 → **8.5** | 1.2 → **9.6** |
+| n_perspectives | 1.28 → **1.81** (share >1: 25% → 81%) | 1.75 → 1.97 |
+| question-answering | 0.5 → 12.3 | 1.2 → 1.3 |
+| perspective shift | 1.6 → 12.4 | 1.1 → 0.4 |
+| reconciliation | 0.19 → 0.69 | 0.03 → 0.09 |
 
-```
-1. 89 - 64 - 6 = 21 (Doesn't equal 19)
-2. 89 - 64 + 6 = 31 (Doesn't equal 19)
-3. 89 - 6 + 64 = 93 (Doesn't equal 19)   ...
-```
+Conflict and persona count rise under both judges (conflict κ = 0.43 between them, the only
+behaviour the two judges agree on beyond chance; Q&A and shift κ 0.09–0.15, so those two
+are judge-dependent). Reconciliation stays low, as you report. Conflict per 100 words also
+rises (0.9 → 3.8), so it is not trace length.
 
-Every genuinely dialogic marker moves the other way over the same steps: *however* 77 → 1,
-*let's try another* 22 → 2, *nope* 26 → 0. The model is converging on a brute-force
-enumeration template that a marker-counting instrument scores as self-disagreement.
+**What the counts are made of.** The same traces, read without a judge:
 
-**So we built your instrument instead** — an LLM judge over your four behaviours
-(question–answering, perspective shift, conflict of perspectives, reconciliation) with
-your counting convention. On stratified traces from the same run:
+- **No validation trace contains a question mark** — 0 of 255 — while the judge counts
+  1,888 question-answering instances. Your definition's example *"Let's try X…? This gives
+  us Y"* is met by every line of an arithmetic enumeration.
+- Conflict tracks the number of `(not 29)`-style rejection lines (ρ = 0.40; late traces
+  average 9.1 such lines and 7.6 conflicts). Late traces look like this:
+  `(87 - 25) - (29 + 23) = 62 - 52 = 10 (not 29). (87 - 25) + (29 - 23) = 68 (not 29). …`
+- In **all 69** late two-persona traces, the second perspective the judge names is a
+  "final answer presentation" role — the `<think>`/`<answer>` split. Sonnet's own labels:
+  *"the exploratory calculation agent"* and *"the answer-presenting agent."*
+- The pronoun runs the other way from your Fig. 4c–d: "we" is in **100%** of validation
+  traces before step 40 and **0%** from step 80; "I" goes 0% → 100%; *wait / however /
+  actually / alternatively* go from 42% of traces to 0% over the same steps.
 
-| steps | Q&A | shift | conflict | reconciliation | n_personas |
-|---|---|---|---|---|---|
-| 1–23 | 0.876 | 0.438 | 0.000 | 0.000 | **1.00** |
-| 98–119 | 0.311 | 0.000 | 0.000 | 0.000 | **1.00** |
-| 210–232 | 0.230 | 0.000 | 0.000 | 0.000 | **1.00** |
+So on this seed the model converges to a single-voice, question-free, marker-free
+enumeration, and your instrument scores that as rising conflict between an increasing
+number of perspectives. We think that is the finding: the curves are reliable (your ICC ≈
+.85; our κ = .43 on conflict) and they are not measuring dialogue on Countdown.
 
-Conflict of perspectives is exactly zero in 7 of 10 bins. `n_personas` is 1.00 in every
-bin, first to last. Nothing rises.
+**Full disclosure, because it bears on how much to trust us.** For three months we said
+your judge prompt was unpublished. It is in your v1 supplement; we missed it. Our first
+Fig. 4 analysis used a paraphrase of your definitions that asked for "distinct
+perspectives" with "a single undifferentiated voice = 1", and under it nothing rose and
+n_personas was 1.00 everywhere. Same traces, same judge, your prompt: 1.5–1.9. We withdrew
+the "does not reproduce" reading when we found this, and the correction is in the public
+record (`results/emergence/FINDINGS.md` §4.10–4.11). We also found that verl prints
+validation generations into the training log and that our first parse mixed them in;
+the two series are now separated and, as it happens, agree.
 
-**With the control, because a judge that always says 1 would produce that table on any
-input.** Same judge, same prompt, same session:
-
-| trace set | n_personas | traces with >1 | shift | reconciliation |
-|---|---|---|---|---|
-| your dialogue prompt's own output (32B teacher) | **2.92** | **100%** | 2.15 | 0.92 |
-| your monologue prompt's own output | 1.00 | 0% | 0.20 | 0.07 |
-| **our RL traces, step > 200** | **1.00** | **0%** | 0.27 | 0.07 |
-
-It finds ~3 personas when personas are there, in every trace. On late-RL traces it finds
-one, and the whole row is indistinguishable from the known-monologue corpus.
-
-**And the two instruments agree on three of your four behaviours**, which is why we think
-the fourth is worth your attention rather than dismissible as judge noise:
-
-| behaviour | judge, first → last | markers, first → last | same direction? | r |
-|---|---|---|---|---|
-| question–answering | 0.561 → 0.262 | 0.028 → 0.000 | yes | +0.60 |
-| perspective shift | 0.236 → 0.060 | 0.085 → 0.000 | yes | **+0.90** |
-| **conflict of perspectives** | 0.000 → 0.000 | 0.085 → **2.976** | **no** | **−0.39** |
-| reconciliation | ~0, flat | ~0.35, flat | both flat | +0.79 |
-
-Perspective shift tracks at r = +0.90 across the whole run. The two instruments part
-company on exactly one behaviour, and it is the one whose marker count is 100% a single
-repeated string.
-
-Our honest summary: **on this run, the answer to Fig. 4 depends entirely on which
-instrument you use**, and we cannot tell from the paper which way yours would fall on a
-numbered enumeration of rejected candidates. That is a question only you can answer, and
-it is the single thing we would most like to hear back about.
-
-Caveats we hold against ourselves: this log is `rollout.n=1` and train batch 256, not your
-config; it is one run; our judge is an Anthropic model rather than Gemini-2.5-Pro (your
-cross-judge ICC ≈ .85 is why we think that is declarable rather than disqualifying); and
-your persona extraction characterises each perspective and answers BFI-10 items from its
-point of view, where ours returns a count — a richer procedure might segment a trace we
-score as one voice. The faithful config is running now, three seeds, and we will send the
-numbers either way.
-
-### A note on judges, since the field has moved
-
-Two papers that appeared after yours bear directly on Fig. 4. Norman, Rivera & Hughes
-(arXiv 2606.19544; 21 judges, 541k judgments) find that exact-match agreement overstates
-chance-corrected agreement by 33–41 points, that judge rankings shift by up to 14 positions
-across benchmarks, and that judges with test–retest above .95 can carry position bias above
-.10 — "reliability without validity". Yang, Hou & Yang (2607.08535) put it in one line: a
-judge score can move when only the evaluator changes. None of this says your ICC ≈ .85 is
-wrong; it says it is a reliability number, and that the published prompt is the part of the
-instrument a reader needs. We have re-scored our own Fig. 4 sample with a second and third
-judge and report chance-corrected agreement (κ, ICC) rather than exact match; the one thing
-we cannot do without a key is reach a second model *family*, and if you were able to share
-Gemini-2.5-Pro's verdicts on even a dozen of our traces we would know within the hour
-whether the disagreement is the judge.
+Caveats we hold against ourselves: one seed; two judges from one vendor (no Gemini key on
+our side — a dozen Gemini-2.5-Pro verdicts on our traces would settle the judge question
+in an hour); and we have not yet run your segmentation prompt or a human rater — the
+50-trace blind sheet is built and waiting.
 
 ## 5. On seeds — you're right, and here's exactly how far ours reaches
 
@@ -255,14 +226,18 @@ sequence length. We don't see the same control described for Qwen — question b
    priming sets match on Gandhi et al.'s four behaviours (verification, backtracking,
    subgoal setting, backward chaining)? If not, that's an alternative explanation for the
    early gap that doesn't involve dialogue.
-7. **Fig. 4's instrument, concretely.** Does your judge score a numbered enumeration of
-   rejected candidates ("1. ... (Doesn't equal 19) 2. ...") as a conflict of perspectives?
-   Ours does not. A judge that did would reproduce our marker-count curve exactly.
-8. **Fig. 4e on Countdown.** Does the judge-inferred persona count rise above 1, and by how
-   much? That one number would tell us immediately whether we are measuring the same thing.
-9. **What the judge reads.** Is Fig. 4b run on training rollouts, on held-out evaluation
-   generations, or on checkpoint samples? Ours are training rollouts at temperature 1.0,
-   which may not be comparable.
+7. **Fig. 4's instrument, concretely.** Your prompt, run by two Claude judges, scores a
+   numbered enumeration of rejected candidates (`… = 10 (not 29). … = 68 (not 29).`) as
+   7–10 conflicts of perspectives per trace, with no question mark in the trace. Does
+   Gemini-2.5-Pro do the same on your traces? Could you share a handful of your step-250
+   validation traces with their verdicts?
+8. **Fig. 4e on Countdown.** In your step-120 two-persona traces, what are the two
+   perspectives' expertise profiles? In ours the second one is always the answer
+   presentation. If yours are the same, Fig. 4e is measuring the output format.
+9. **What the judge reads.** Your Methods say validation generations at each checkpoint;
+   we now score those (greedy, ~17 per checkpoint printed by verl) and the training
+   rollouts separately, and they agree. At what temperature are your validation traces
+   sampled?
 10. **Rise and fall.** In your multi-seed runs, does the marker curve rise and then fall?
    And if it falls, how do you separate the behaviour fading from it going implicit, given
    the explicit-to-implicit transition Gandhi et al. report for Qwen on this exact task?

@@ -21,7 +21,7 @@ import random
 from pathlib import Path
 
 from analysis.judge_agreement import FIELDS, format_agreement, pairwise_agreement
-from rl.judge import BEHAVIOURS, DEFINITIONS
+from rl.judge import BEHAVIOURS, PAPER_BEHAVIOUR_TEMPLATE, PAPER_PERSONA_TEMPLATE
 
 
 def select_traces(judged, n: int = 50, seed: int = 1) -> list[dict]:
@@ -45,13 +45,12 @@ def select_traces(judged, n: int = 50, seed: int = 1) -> list[dict]:
 
 _INSTRUCTIONS = """# Annotation sheet
 
-Read each trace and count, for each of the four behaviours below, the number of distinct
-instances you see. Use 0 if none are present. Then report **n personas**: the number of
-distinct perspectives present in the trace; a trace written in a single undifferentiated
-voice has n personas = 1. Rate only what is in the trace; do not reward or penalise
-whether the reasoning is correct. Enter your counts in `ratings_template.csv`.
+For each trace, count how many times behaviours corresponding to each of the four
+dimensions appear, using the definitions below (the paper's, verbatim). For each category,
+count the number of distinct times the behaviour occurs; if none are present, use 0. Then
+report **n personas** using the paper's persona definition, also below. Rate only what is
+in the trace. Enter your counts in `ratings_template.csv`.
 
-Definitions (the paper's own words):
 {defs}
 
 The traces are in random order. Do not look at `answer_key.json` until you have finished.
@@ -64,7 +63,11 @@ def write_sheet(selected, out_dir) -> dict:
     width = max(2, len(str(len(selected))))
     ids = [f"T{i + 1:0{width}d}" for i in range(len(selected))]
 
-    defs = "\n".join(f"- **{k.replace('_', ' ')}**: {v}" for k, v in DEFINITIONS.items())
+    beh = PAPER_BEHAVIOUR_TEMPLATE.split("Use the following definitions:")[1]
+    beh = beh.split("For each category")[0].strip()
+    per = PAPER_PERSONA_TEMPLATE.split("For each distinct perspective")[0].strip()
+    defs = ("## Behaviour definitions\n\n" + beh
+            + "\n\n## Persona definition (n personas = number of distinct perspectives)\n\n" + per)
     parts = [_INSTRUCTIONS.format(defs=defs)]
     key = {}
     for rid, r in zip(ids, selected):
@@ -123,7 +126,11 @@ def main() -> None:
         d = json.loads(a.judged.read_text())
         tag = a.judge or d["primary"]
         rollouts = parse_rollouts(a.log.read_text(errors="ignore"))
+        if d.get("source", "all") != "all":          # the judged file's series, not the whole log
+            rollouts = [r for r in rollouts if r.get("source", "train") == d["source"]]
         sample = stratified_sample(rollouts, d["bins"], d["per_bin"], seed=d["seed"])
+        for v in d["verdicts"][tag]:                 # the resample must be the judged sample
+            assert sample[v["idx"]]["step"] == v["step"], "sample mismatch: wrong log or series"
         judged = [{**sample[v["idx"]], **{f: v[f] for f in FIELDS}, "bin": v["bin"]}
                   for v in d["verdicts"][tag]]
         sel = select_traces(judged, n=a.n, seed=a.seed)

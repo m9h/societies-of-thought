@@ -1,5 +1,11 @@
 # Fig. 4 (C4): the instrument decides the answer
 
+> **Read §4.10–4.11 first (2026-10-08).** Under the paper's own prompts, run verbatim,
+> Fig. 4b/4e **reproduce** on our run: conflict and persona count rise over training under
+> two judges. Under our earlier paraphrased prompt (§4–4.9) nothing rose. The title stands,
+> but the direction of the dependence is the reverse of what §4–4.9 implied — and the
+> judge-free series in §4.10 shows what the paper's instrument is counting.
+
 *Status 2026-09-19. The faithful multi-seed run is in flight; everything below is from
 `results/rl_ab/tz_train_claimA.log` — un-primed Qwen-2.5-3B, PPO on Countdown,
 accuracy-only reward, 232 steps, 1,099 logged rollouts — which is the right experiment
@@ -164,6 +170,10 @@ that never becomes two.
 
 ### A design note on the judge
 
+> ⚠ Correction (2026-10-08): the paragraphs in this section and in §6 that treat the
+> paper's prompt as unavailable are wrong; both prompts are in the v1 Supplementary Methods
+> and are now the default instrument (`paper-v1`). See §4.10.
+
 A parse failure is never read as zero. Traces lengthen under RL, so judge failures
 concentrate in late training, and a fail-open judge would manufacture precisely the
 decline being looked for. `parse_verdict` raises. The cache key carries both judge model
@@ -276,6 +286,201 @@ judge sees 0.06. Correlations against the judge across bins are ~0 or negative
 disagreed with the judge on every configuration tested, in both directions and by up to two
 orders of magnitude. **Report the judge; do not report marker rates.**
 
+## 4.10 Three corrections to our own instrument, found while cross-judging (2026-10-08)
+
+Re-scoring the published 256-trace sample with a second judge (Haiku 4.5) exposed three
+things that were wrong in §4–4.9, all ours. Each is fixed in the code and every number
+below §4.10 is on the corrected pipeline.
+
+1. **The paper's judge prompts are published.** We said for three months that the Fig. 4
+   instrument was unpublished (§4 "A design note", §6 Q3, the note to the authors, the
+   literature review). The v1 HTML's *Supplementary Methods: LLM-as-Judge prompts* carries
+   the behaviour-counting prompt and the persona-identification prompt in full. Our v1
+   prompt paraphrased their definitions and folded the persona count into the same call.
+   `rl/judge.py` now ships both prompts verbatim as `paper-v1` (two calls per trace), and
+   the claim is withdrawn wherever it appeared. One consequence is load-bearing: their
+   persona prompt lists *"however," "but," "alternatively," "wait," "let me check,"
+   "actually"* as indicators of a perspective and instructs the judge to treat *"each
+   identifiable shift as a boundary between perspectives."* Under that instrument a persona
+   count is close to a marker-segment count by construction, which is the mechanism §3
+   proposed for the marker curve.
+2. **The log mixes two series, and the paper's is the one we were not reporting.** verl
+   prints the greedy held-out validation generations into the same log at every 10th step.
+   Our parser attributed them to the step as if they were temperature-1 training rollouts:
+   **453 of 2,555 (18%)**, concentrated at steps 0, 10, 20, … The paper's Methods: *"we
+   evaluate model performance on a held-out validation set of 1,024 Countdown problems at
+   each training checkpoint (every 10 steps). For each checkpoint, we generate reasoning
+   traces for all validation problems and measure … the frequency of conversational
+   behaviours."* So Fig. 4b is a validation-generation curve. `parse_rollouts` now tags
+   `source`; the two series are judged separately below.
+3. **Normalisation.** §4.9 reported judge counts per 100 words. The paper reports
+   frequency per trace, unnormalised. Traces double in length over training (105 → 211
+   words), so per-100-words rates fall even where per-trace counts do not: under the v1
+   judge, per-trace question-answering goes 0.84 → 1.00 and perspective shift 0.78 → 0.97
+   (flat to rising), while conflict goes 0.31 → 0.00 and n_personas stays 1.00. "All four
+   behaviours decline" was true per word and **false per trace** for two of the four.
+   Conflict → 0 and personas = 1 hold under either normalisation.
+
+Also stripped: the scorer's post-hoc verdict line (`Invalid equation` etc., 2,239 traces)
+and the prompt's `Assistant:`; responses are now cut at `<|endoftext|>`.
+
+### A judge-free series on the corrected parse
+
+Share of traces containing the token, by bin, on the **validation** generations (the
+paper's series) and the training rollouts:
+
+| validation (greedy) | n | "we" | "I" | any of *wait/however/actually/alternatively* | words |
+|---|---|---|---|---|---|
+| steps 0–30 | 76 | **1.00** | 0.00 | 0.42 | 143 |
+| 40–70 | 76 | 0.41 | 0.64 | 0.29 | 264 |
+| 80–100 | 53 | 0.00 | 1.00 | 0.00 | 245 |
+| 110–250 (four bins) | 42–60 | 0.00–0.02 | 1.00 | 0.00 | 169–212 |
+
+| train (T=1.0) | n | "we" | "I" | markers | words |
+|---|---|---|---|---|---|
+| 1–32 | 376 | 0.52 | 0.31 | 0.17 | 109 |
+| 33–63 | 253 | 0.55 | 0.56 | 0.31 | 175 |
+| 64–94 | 239 | 0.13 | 0.95 | 0.08 | 238 |
+| 95–249 (five bins) | 222–260 | 0.00–0.01 | 0.99–1.00 | 0.00–0.01 | 175–210 |
+
+The paper's Fig. 4c–d narrative is that the step-40 model is "mechanical, enumerative"
+and by step 120 "two distinctive simulated personas have appeared, recognizing their
+collectivity with the pronoun 'we'." On this run the pronoun runs the other way: the base
+model starts in a collective "we" voice (100% of greedy validation traces before step 40),
+RL replaces it with a single "I" by step 80, and the transitional markers their persona
+prompt keys on vanish at the same point. Question marks are essentially absent in every
+bin (≤ 0.08 per trace). None of this needs a judge. What the paper's own judge makes of
+it, with their prompts verbatim, is §4.11.
+
+## 4.11 The paper's instrument, verbatim: Fig. 4 reproduces — from a monologue
+
+Three Anthropic judges were asked to score two stratified samples (8 bins × 32) with the
+paper's two prompts exactly as published: the validation generations (the paper's series)
+and the training rollouts. **Claude Opus 5 refused every call** — `stop_reason: refusal`,
+0 output tokens, on 100% of 256 + 256 traces, with the paper's behaviour prompt and nothing
+else in the context. (A judge that will not read the instrument is a judge-change effect
+of the kind Yang et al. describe, and it is reported, not papered over.) The other two
+judges completed with 1 and 0 failures.
+
+### Validation series (the paper's Fig. 4b)
+
+*claude-sonnet-5* — mean count per trace, by training-step bin:
+
+| steps | n | Q&A | shift | conflict | reconc. | personas | >1 persona | words |
+|---|---|---|---|---|---|---|---|---|
+| 0–30 | 32 | 0.53 | 1.62 | 1.41 | 0.19 | 1.28 | 0.25 | 161 |
+| 40–70 | 31 | 5.58 | 6.84 | 6.16 | 0.32 | 1.16 | 0.16 | 245 |
+| 80–100 | 32 | 4.91 | 11.47 | 11.06 | 0.47 | 1.22 | 0.22 | 249 |
+| 110–130 | 32 | 9.59 | 10.28 | 4.62 | 0.69 | 1.50 | 0.50 | 193 |
+| 140–160 | 32 | 9.22 | 9.97 | 7.44 | 0.75 | 1.62 | 0.62 | 196 |
+| 170–190 | 32 | 9.25 | 9.06 | 6.84 | 0.62 | 1.69 | 0.69 | 174 |
+| 200–220 | 32 | 7.84 | 8.50 | 7.41 | 0.56 | 1.66 | 0.66 | 169 |
+| 230–250 | 32 | 12.25 | 12.44 | 8.53 | 0.69 | 1.81 | 0.81 | 225 |
+
+*claude-haiku-4-5-20251001* — mean count per trace, by training-step bin:
+
+| steps | n | Q&A | shift | conflict | reconc. | personas | >1 persona | words |
+|---|---|---|---|---|---|---|---|---|
+| 0–30 | 32 | 1.19 | 1.06 | 1.16 | 0.03 | 1.75 | 0.75 | 161 |
+| 40–70 | 32 | 2.12 | 4.06 | 2.22 | 0.09 | 1.47 | 0.47 | 256 |
+| 80–100 | 32 | 2.03 | 2.16 | 1.66 | 0.03 | 1.56 | 0.56 | 249 |
+| 110–130 | 32 | 1.00 | 0.59 | 5.59 | 0.03 | 1.88 | 0.88 | 193 |
+| 140–160 | 32 | 1.38 | 0.84 | 4.69 | 0.09 | 1.81 | 0.81 | 196 |
+| 170–190 | 32 | 1.12 | 0.88 | 8.84 | 0.03 | 1.94 | 0.94 | 174 |
+| 200–220 | 32 | 1.12 | 0.41 | 7.41 | 0.06 | 1.88 | 0.88 | 169 |
+| 230–250 | 32 | 1.25 | 0.41 | 9.59 | 0.09 | 1.97 | 0.97 | 225 |
+
+Agreement on the same traces (chance-corrected beside exact match):
+
+| pair | field | n | exact | κ | κ_quad | ICC(3,1) | ρ | mean A | mean B |
+|---|---|---|---|---|---|---|---|---|---|
+| claude-sonnet-5 vs claude-haiku-4-5-20251001 | Q&A | 255 | 0.45 | 0.09 | 0.02 | 0.03 | 0.12 | 7.40 | 1.41 |
+| claude-sonnet-5 vs claude-haiku-4-5-20251001 | shift | 255 | 0.29 | 0.15 | 0.02 | 0.04 | 0.00 | 8.78 | 1.27 |
+| claude-sonnet-5 vs claude-haiku-4-5-20251001 | conflict | 255 | 0.55 | 0.43 | 0.53 | 0.54 | 0.50 | 6.69 | 5.12 |
+| claude-sonnet-5 vs claude-haiku-4-5-20251001 | reconc. | 255 | 0.52 | 0.10 | 0.10 | 0.18 | 0.23 | 0.54 | 0.06 |
+| claude-sonnet-5 vs claude-haiku-4-5-20251001 | personas | 255 | 0.61 | 0.23 | 0.23 | 0.28 | 0.29 | 1.49 | 1.78 |
+
+### Training series
+
+*claude-sonnet-5* — mean count per trace, by training-step bin:
+
+| steps | n | Q&A | shift | conflict | reconc. | personas | >1 persona | words |
+|---|---|---|---|---|---|---|---|---|
+| 1–32 | 32 | 0.78 | 1.25 | 0.78 | 0.28 | 1.44 | 0.41 | 86 |
+| 33–63 | 30 | 3.70 | 5.00 | 3.30 | 0.73 | 1.37 | 0.37 | 185 |
+| 64–94 | 32 | 7.22 | 9.88 | 5.88 | 0.69 | 1.31 | 0.31 | 255 |
+| 95–125 | 32 | 7.84 | 8.75 | 3.97 | 0.75 | 1.53 | 0.53 | 185 |
+| 126–156 | 32 | 9.03 | 9.34 | 6.59 | 0.69 | 1.62 | 0.62 | 192 |
+| 157–187 | 32 | 7.94 | 8.28 | 6.12 | 0.78 | 1.72 | 0.72 | 160 |
+| 188–218 | 31 | 11.71 | 11.90 | 9.90 | 0.74 | 1.58 | 0.58 | 220 |
+| 219–249 | 32 | 12.00 | 11.75 | 10.59 | 0.72 | 1.78 | 0.78 | 225 |
+
+*claude-haiku-4-5-20251001* — mean count per trace, by training-step bin:
+
+| steps | n | Q&A | shift | conflict | reconc. | personas | >1 persona | words |
+|---|---|---|---|---|---|---|---|---|
+| 1–32 | 31 | 1.03 | 1.32 | 0.90 | 0.03 | 1.58 | 0.55 | 89 |
+| 33–63 | 32 | 2.38 | 3.81 | 2.81 | 0.19 | 1.47 | 0.47 | 197 |
+| 64–94 | 32 | 3.28 | 5.16 | 2.62 | 0.12 | 1.47 | 0.47 | 255 |
+| 95–125 | 32 | 1.03 | 2.16 | 4.44 | 0.03 | 1.75 | 0.75 | 185 |
+| 126–156 | 32 | 1.00 | 1.38 | 5.00 | 0.00 | 1.81 | 0.81 | 192 |
+| 157–187 | 32 | 1.06 | 1.16 | 5.59 | 0.09 | 1.97 | 0.97 | 160 |
+| 188–218 | 32 | 1.00 | 1.00 | 8.69 | 0.06 | 1.81 | 0.81 | 225 |
+| 219–249 | 32 | 1.00 | 0.91 | 7.34 | 0.09 | 1.84 | 0.84 | 225 |
+
+Agreement on the same traces (chance-corrected beside exact match):
+
+| pair | field | n | exact | κ | κ_quad | ICC(3,1) | ρ | mean A | mean B |
+|---|---|---|---|---|---|---|---|---|---|
+| claude-sonnet-5 vs claude-haiku-4-5-20251001 | Q&A | 252 | 0.45 | 0.15 | 0.06 | 0.09 | 0.21 | 7.57 | 1.44 |
+| claude-sonnet-5 vs claude-haiku-4-5-20251001 | shift | 252 | 0.32 | 0.23 | 0.10 | 0.14 | 0.04 | 8.31 | 2.06 |
+| claude-sonnet-5 vs claude-haiku-4-5-20251001 | conflict | 252 | 0.54 | 0.43 | 0.51 | 0.51 | 0.43 | 5.92 | 4.67 |
+| claude-sonnet-5 vs claude-haiku-4-5-20251001 | reconc. | 252 | 0.40 | 0.08 | 0.08 | 0.17 | 0.20 | 0.67 | 0.08 |
+| claude-sonnet-5 vs claude-haiku-4-5-20251001 | personas | 252 | 0.66 | 0.30 | 0.26 | 0.28 | 0.29 | 1.55 | 1.71 |
+
+### What this means
+
+1. **Fig. 4b and 4e reproduce under the paper's instrument.** Conflict of perspectives
+   rises roughly 1 → 8–10 per trace under both judges (κ = 0.43 between them, the only
+   field on which they agree beyond chance), and so does the persona count: Sonnet 1.28 →
+   1.81 with the share of traces at >1 persona going 0.25 → 0.81; Haiku 1.75 → 1.97. Per
+   100 words, conflict still rises 0.87 → 3.79, so it is not trace length (persona count
+   is uncorrelated with length, ρ = 0.02). Reconciliation stays low and flat, as the paper
+   says it does. Question-answering and perspective shift are judge-dependent: Sonnet 0.5
+   → 12 per trace, Haiku flat near 1 or falling; κ 0.09–0.23.
+2. **Our §4–4.9 null was our prompt.** The v1 paraphrase asked for "distinct perspectives"
+   with "a single undifferentiated voice has n_personas = 1" and gave no examples; the
+   paper's persona prompt names transitional markers and cognitive-role shifts as
+   perspective boundaries and says to treat "each identifiable shift as a boundary." Same
+   traces, same judge, 1.00 personas under ours and 1.5–1.9 under theirs. We were wrong to
+   call the persona result non-reproducing; we were measuring a different construct.
+3. **What the paper's instrument is counting on these traces, judge-free (§4.10):**
+   - *Question-answering*: **no validation trace contains a question mark** (0 of 255),
+     yet Sonnet counts 1,888 Q&A instances; 220 traces score Q&A > 0 with no "?". The
+     definition's own example, *"Let's try X…? This gives us Y"*, is satisfied by every
+     line of an arithmetic enumeration.
+   - *Conflict*: correlates with the count of `(not 29)`-style rejection lines (ρ = 0.40;
+     late traces average 9.1 such lines and 7.6 conflicts). These are the "doesn't equal"
+     template of §3, now scored by the paper's prompt rather than by our regex.
+   - *Personas*: in every one of the 69 late two-persona traces, the second perspective is
+     a "final answer presentation" role — the `<think>` / `<answer>` split the prompt format
+     imposes. Sonnet's own labels: *"the exploratory calculation agent"* and *"the
+     answer-presenting agent."*
+   - Meanwhile "we" goes 100% → 0%, "I" 0% → 100%, and *wait/however/actually/alternatively*
+     42% → 0% by step 80 (§4.10). The paper's Fig. 4c–d story — step 40 mechanical, step
+     120 two personas saying "we" — runs backwards on this seed.
+4. **So the answer to Fig. 4 is now sharper than "it depends on the instrument."** The
+   paper's instrument reproduces the paper's curves on a run whose traces become a
+   single-voice, question-free, marker-free enumeration. That is a content-validity
+   problem in Norman et al.'s sense: reliable (κ = 0.43 on conflict across two judges;
+   the paper's ICC ≈ .85) and not measuring dialogue. The positive control (§4: dialogue
+   corpus 2.9 personas, monologue 1.0 under the v1 prompt) still shows a judge *can* tell
+   the two apart when asked our way; the paper's prompt asks a different question.
+
+Files: `results/emergence/cross_judge_validation.json`, `cross_judge_train.json`
+(verdicts, agreement, curves, failures), `results/emergence/human/` (50-trace blind sheet
+on the validation series, paper's definitions; **awaiting a human rater**).
+
 ## 5. Limits — read before quoting
 
 - **Config.** §2–4 are on the claimA log (`rollout.n=1`, train batch 256). §4.5 and §4.9
@@ -292,9 +497,12 @@ orders of magnitude. **Report the judge; do not report marker rates.**
   on one model family until §4.10; it still rests on one *vendor's* models, because no
   second-family key is available here. `rl/judge.py` takes `gemini/…` or `openai/…` specs
   the moment one is.
-- **Persona extraction.** The paper's judge characterises each perspective and answers
-  BFI-10 items from its point of view. Ours returns a count. A richer procedure could
-  segment a trace we score as one voice.
+- **Persona extraction.** §4–4.9 used our own single-call count. §4.11 uses the paper's
+  persona prompt (BFI-10 and expertise per perspective) verbatim; the segmentation
+  follow-up prompt is not run.
+- **Opus refusal.** One of three intended judges returned no output on the paper's
+  prompt; the cross-judge result is two judges, one vendor.
+- **Human validation.** Not yet done; the sheet exists.
 - **n = 13–15 per control set**; 861 traces judged across all tables, 0 failures.
 - **Countdown.** Arithmetic search by a 3B base model is the paper's own choice of task
   for this figure, but it is not where dialogue would be most expected.
@@ -320,7 +528,8 @@ Full review in `docs/literature_2026_H2.md`. Four things change how §4–6 shou
    .10 — reliability without validity. Yang, Hou & Yang (2607.08535): a judge score "can
    move even when the candidate responses stay fixed, simply because the evaluator has
    changed." In that vocabulary the paper's ICC ≈ .85 is a *reliability* number, and Fig.
-   4b/4e are an instrument reading with an unpublished instrument. The same standard
+   4b/4e are an instrument reading, and the instrument's prompts are in the v1
+   supplement (see §4.10, correction 1 — we had said otherwise). The same standard
    applies to us, which is why §4.10 exists and why every table from here reports κ and
    ICC rather than exact match.
 2. **A concession.** Boppana et al. (2603.05488, "Reasoning Theater") show that discourse

@@ -94,7 +94,7 @@ def main() -> None:
     ap.add_argument("--per-bin", type=int, default=32)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--primary", default="claude-sonnet-5")
-    ap.add_argument("--judges", nargs="+", required=True,
+    ap.add_argument("--judges", nargs="*", default=[],
                     help="provider/model specs; bare names are Anthropic")
     ap.add_argument("--cache", type=Path, default=Path("results/emergence/judge_cache.jsonl"))
     ap.add_argument("--out", type=Path, default=Path("results/emergence/cross_judge.json"))

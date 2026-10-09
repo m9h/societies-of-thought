@@ -69,8 +69,16 @@ Complete log `results/emergence/fig4_qwen_s0_FINAL.log.gz`, 2,555 rollouts.
 | fine-grained steps 0–40 | no hidden early rise |
 | positive control, same judge | dialogue corpus 2.87 personas (93% >1); monologue 1.00; late-RL 1.00 |
 
-Grand total 861 traces judged, 0 failures, every one at a single persona. Three instruments,
-three sessions, same answer. The paper is still v1 with no code.
+Grand total 861 traces judged, 0 failures, every one at a single persona — **under OUR
+prompt.** ⚠ **Reversed 2026-10-08 (FINDINGS §4.10–4.11):** the paper's prompts are in its
+v1 supplement (we had said "unpublished"); run verbatim with two judges on both the
+validation series (the one the paper judges — verl prints it into the log, 453 traces our
+parser had mixed in as training) and the training series, **conflict rises ~1 → 8–10 per
+trace and persona count 1.3 → 1.8 (share >1: 25% → 81%)**. Fig. 4b/4e reproduce. What the
+instrument is counting, judge-free: 0/255 traces contain "?", conflict = `(not 29)` lines,
+the second "persona" is always the answer-presentation role, "we" goes 100% → 0%. A
+content-validity result, not a non-replication. Opus 5 refused the paper's prompt on every
+call. Cross-family judge (Gemini) still needs a key. The paper is still v1 with no code.
 
 **Where the uncertainty now lives: the instrument, not the seed.** The judge is one vendor's
 models, not Gemini-2.5-Pro, and Norman et al. (2606.19544) show ICC ≈ .85 coexists with
@@ -84,7 +92,10 @@ large judge-specific bias. Tooling added 2026-10-08 (all red-green tested):
   (`results/emergence/human/`). **Needs a human: fill `ratings_template.csv`.**
 - `scripts/run_status.sh` — replaces the session monitor that read step 0 and reported a
   successful completion as FAILURE.
-- `scripts/export_fig4_corpus.py` — the corpus on HF (see §C4 results line below).
+- `scripts/export_fig4_corpus.py` — corpus built and verified; **public upload blocked for
+  the agent, user runs**: `python -m scripts.export_fig4_corpus --repo
+  mhough/sot-fig4-countdown-ppo-rollouts --public`.
+- `results/emergence/human/` — 50-trace blind sheet, paper's definitions, **needs a human**.
 
 ### C5 — Claim B, faithful replication (done, **n=1**)
 Qwen2.5-3B, 3 arms, 250 steps, the paper's teacher/prompts/out-of-domain pool,

@@ -1,0 +1,502 @@
+{
+ "T01": {
+  "step": 150,
+  "bin": 4,
+  "sha256": "b2e37d5f5f94d002af3f63e71748872de04e11314e5e22e19b8f6a150139e5cf",
+  "question_answering": 1,
+  "perspective_shift": 2,
+  "conflict_of_perspectives": 0,
+  "reconciliation": 1,
+  "n_personas": 2
+ },
+ "T02": {
+  "step": 240,
+  "bin": 7,
+  "sha256": "d1723a5533b9fbc3434f9537eb92ff50d8c03fccd0369ca2033b9a7e29e2f544",
+  "question_answering": 1,
+  "perspective_shift": 1,
+  "conflict_of_perspectives": 0,
+  "reconciliation": 1,
+  "n_personas": 2
+ },
+ "T03": {
+  "step": 0,
+  "bin": 0,
+  "sha256": "b85004d329a81c7721db64febb9d4c481f5256f3b1bad26f2916b8b3360b906f",
+  "question_answering": 0,
+  "perspective_shift": 0,
+  "conflict_of_perspectives": 0,
+  "reconciliation": 0,
+  "n_personas": 1
+ },
+ "T04": {
+  "step": 150,
+  "bin": 4,
+  "sha256": "3ab0a27ac19ca6e34f13e127572a16e676be247e8e54d34f1b170190ca5f8a20",
+  "question_answering": 22,
+  "perspective_shift": 22,
+  "conflict_of_perspectives": 0,
+  "reconciliation": 0,
+  "n_personas": 2
+ },
+ "T05": {
+  "step": 30,
+  "bin": 0,
+  "sha256": "16ebf0dbe22183b8b603f1f2d076f2b5b33bec477ea43f8329a490677e5fc9e6",
+  "question_answering": 0,
+  "perspective_shift": 2,
+  "conflict_of_perspectives": 1,
+  "reconciliation": 1,
+  "n_personas": 1
+ },
+ "T06": {
+  "step": 250,
+  "bin": 7,
+  "sha256": "989d7173032f1e5192a1f8e05fe567aa08955d50531eb07211f2651eff693ce1",
+  "question_answering": 1,
+  "perspective_shift": 4,
+  "conflict_of_perspectives": 3,
+  "reconciliation": 1,
+  "n_personas": 1
+ },
+ "T07": {
+  "step": 20,
+  "bin": 0,
+  "sha256": "8d49980910f8931a5923bbe53e108e04389d640b79ad342fa33cb6ced67a6bf3",
+  "question_answering": 0,
+  "perspective_shift": 0,
+  "conflict_of_perspectives": 0,
+  "reconciliation": 0,
+  "n_personas": 1
+ },
+ "T08": {
+  "step": 120,
+  "bin": 3,
+  "sha256": "a859af2e49cf7454a569ab305c50488468fd481ebf530af6909aad65b8ee3d53",
+  "question_answering": 22,
+  "perspective_shift": 21,
+  "conflict_of_perspectives": 21,
+  "reconciliation": 1,
+  "n_personas": 2
+ },
+ "T09": {
+  "step": 220,
+  "bin": 6,
+  "sha256": "b132fa2f53c153325ff6791a3001f205ef409cc7d7d807ba79958ae25d95385f",
+  "question_answering": 25,
+  "perspective_shift": 25,
+  "conflict_of_perspectives": 25,
+  "reconciliation": 0,
+  "n_personas": 2
+ },
+ "T10": {
+  "step": 120,
+  "bin": 3,
+  "sha256": "ab251c45a1ae4101cba3b6b5c58444e3087606573fe3c2dee4ac67fa6b486f22",
+  "question_answering": 1,
+  "perspective_shift": 2,
+  "conflict_of_perspectives": 1,
+  "reconciliation": 1,
+  "n_personas": 1
+ },
+ "T11": {
+  "step": 130,
+  "bin": 3,
+  "sha256": "d1b265b629e1eb49ff491374a3040078d008503e8b9465d6d2543b635d5f7515",
+  "question_answering": 1,
+  "perspective_shift": 0,
+  "conflict_of_perspectives": 0,
+  "reconciliation": 0,
+  "n_personas": 1
+ },
+ "T12": {
+  "step": 120,
+  "bin": 3,
+  "sha256": "0eb0652e9a46b3c156174535f43e38222ee2c5c6a3c6e552e5e6b72e0bd8509f",
+  "question_answering": 15,
+  "perspective_shift": 15,
+  "conflict_of_perspectives": 14,
+  "reconciliation": 1,
+  "n_personas": 1
+ },
+ "T13": {
+  "step": 40,
+  "bin": 1,
+  "sha256": "06890277a2babd18b5c5b33c795e078c50229ee56ea51cb62192eadbe00a329f",
+  "question_answering": 0,
+  "perspective_shift": 17,
+  "conflict_of_perspectives": 16,
+  "reconciliation": 0,
+  "n_personas": 1
+ },
+ "T14": {
+  "step": 70,
+  "bin": 1,
+  "sha256": "70530b1fcefc26b5e110b516afbd9fd0bf65efcfcab5f4cb53a1f5f0ccc4b56d",
+  "question_answering": 1,
+  "perspective_shift": 0,
+  "conflict_of_perspectives": 0,
+  "reconciliation": 1,
+  "n_personas": 1
+ },
+ "T15": {
+  "step": 190,
+  "bin": 5,
+  "sha256": "a7685c3456a1813faf79b2842f3e6f7e253d54164fc89e25f53b29193620dae2",
+  "question_answering": 1,
+  "perspective_shift": 0,
+  "conflict_of_perspectives": 0,
+  "reconciliation": 1,
+  "n_personas": 2
+ },
+ "T16": {
+  "step": 10,
+  "bin": 0,
+  "sha256": "fbc4633afe984c98e9706d38c59111373b533cefbbcfac7403be64a7ae81d6d1",
+  "question_answering": 0,
+  "perspective_shift": 1,
+  "conflict_of_perspectives": 0,
+  "reconciliation": 0,
+  "n_personas": 1
+ },
+ "T17": {
+  "step": 90,
+  "bin": 2,
+  "sha256": "512ec9238d84d2f04d88acc3466cfe98e0d7dd2b5820a998ae265acc2aa3e25f",
+  "question_answering": 1,
+  "perspective_shift": 14,
+  "conflict_of_perspectives": 14,
+  "reconciliation": 1,
+  "n_personas": 2
+ },
+ "T18": {
+  "step": 220,
+  "bin": 6,
+  "sha256": "1c41d029e019bd7b8be84cdaa1a774b96271c627add250addcf72c52eab797ce",
+  "question_answering": 4,
+  "perspective_shift": 4,
+  "conflict_of_perspectives": 3,
+  "reconciliation": 1,
+  "n_personas": 2
+ },
+ "T19": {
+  "step": 0,
+  "bin": 0,
+  "sha256": "5a15848a97fdb3e084eb958e87be44ee191e4e9bcbb2f64058316c5338beba98",
+  "question_answering": 0,
+  "perspective_shift": 0,
+  "conflict_of_perspectives": 0,
+  "reconciliation": 0,
+  "n_personas": 1
+ },
+ "T20": {
+  "step": 80,
+  "bin": 2,
+  "sha256": "d503ab0e17afa72b923fcb343026ad67c62407a7f2505c62fd3a1befb3934d1b",
+  "question_answering": 0,
+  "perspective_shift": 28,
+  "conflict_of_perspectives": 28,
+  "reconciliation": 0,
+  "n_personas": 1
+ },
+ "T21": {
+  "step": 140,
+  "bin": 4,
+  "sha256": "3f5c76320f221fef9c2bf7a04c52e2f401ee4884cbc8690d2a5926fd6ca50a29",
+  "question_answering": 1,
+  "perspective_shift": 2,
+  "conflict_of_perspectives": 1,
+  "reconciliation": 1,
+  "n_personas": 1
+ },
+ "T22": {
+  "step": 190,
+  "bin": 5,
+  "sha256": "3f1f2095d6bfd6a57f6c6323d73746a1a3e7b05446fb11275f07c4e6137ff512",
+  "question_answering": 1,
+  "perspective_shift": 0,
+  "conflict_of_perspectives": 0,
+  "reconciliation": 1,
+  "n_personas": 2
+ },
+ "T23": {
+  "step": 190,
+  "bin": 5,
+  "sha256": "2af5b35addf7db75af9f23caa9b5fcd3d9cff1665028bee617895e391af3279d",
+  "question_answering": 1,
+  "perspective_shift": 4,
+  "conflict_of_perspectives": 3,
+  "reconciliation": 1,
+  "n_personas": 1
+ },
+ "T24": {
+  "step": 230,
+  "bin": 7,
+  "sha256": "77bcec35263071b34bec4dc1656894198fa34c5397a15a1057d9e353bbbd110c",
+  "question_answering": 1,
+  "perspective_shift": 3,
+  "conflict_of_perspectives": 2,
+  "reconciliation": 1,
+  "n_personas": 1
+ },
+ "T25": {
+  "step": 230,
+  "bin": 7,
+  "sha256": "bb47676175637b72e5c71174ce99809853348c57a87ec15e49fadc08c9e432a4",
+  "question_answering": 21,
+  "perspective_shift": 20,
+  "conflict_of_perspectives": 20,
+  "reconciliation": 0,
+  "n_personas": 2
+ },
+ "T26": {
+  "step": 170,
+  "bin": 5,
+  "sha256": "79565c825bb4b44d44889923d3e910285b926d199db874a69b2b2f395774a3d8",
+  "question_answering": 1,
+  "perspective_shift": 8,
+  "conflict_of_perspectives": 8,
+  "reconciliation": 1,
+  "n_personas": 1
+ },
+ "T27": {
+  "step": 90,
+  "bin": 2,
+  "sha256": "b8b79cf59b239a1aa77c25ced5aeafc254fc15efcfd8463f555d7a1ffc3968fe",
+  "question_answering": 16,
+  "perspective_shift": 16,
+  "conflict_of_perspectives": 15,
+  "reconciliation": 0,
+  "n_personas": 2
+ },
+ "T28": {
+  "step": 90,
+  "bin": 2,
+  "sha256": "4e2b9bb6e6af1175a47a8c7c931429f71540ff11ddcebf825ef36d813099883b",
+  "question_answering": 0,
+  "perspective_shift": 35,
+  "conflict_of_perspectives": 35,
+  "reconciliation": 0,
+  "n_personas": 1
+ },
+ "T29": {
+  "step": 140,
+  "bin": 4,
+  "sha256": "3c0579533ef5537c3a22139be0809e2fe3f43a61a01a178f19e4b03d400ab370",
+  "question_answering": 18,
+  "perspective_shift": 18,
+  "conflict_of_perspectives": 18,
+  "reconciliation": 1,
+  "n_personas": 2
+ },
+ "T30": {
+  "step": 210,
+  "bin": 6,
+  "sha256": "5c8ebed793e6bcfc336cae7781a55d331ecc04b372dbabfd6cc20090ec33a831",
+  "question_answering": 1,
+  "perspective_shift": 3,
+  "conflict_of_perspectives": 2,
+  "reconciliation": 1,
+  "n_personas": 1
+ },
+ "T31": {
+  "step": 70,
+  "bin": 1,
+  "sha256": "6630059a66edbc7db425e55142ead1b132864451ebfa50021613d752bad41d32",
+  "question_answering": 17,
+  "perspective_shift": 17,
+  "conflict_of_perspectives": 17,
+  "reconciliation": 0,
+  "n_personas": 1
+ },
+ "T32": {
+  "step": 110,
+  "bin": 3,
+  "sha256": "1c01f3ddca45db3437a69f15b7a5c8a4b586c295b186d0f16ef8597e42a1f20b",
+  "question_answering": 24,
+  "perspective_shift": 23,
+  "conflict_of_perspectives": 0,
+  "reconciliation": 1,
+  "n_personas": 2
+ },
+ "T33": {
+  "step": 90,
+  "bin": 2,
+  "sha256": "c25dd970c236a7625e83a4253e5d43bf9303fb0fdcf669df0ce6a7671b98f656",
+  "question_answering": 1,
+  "perspective_shift": 4,
+  "conflict_of_perspectives": 4,
+  "reconciliation": 1,
+  "n_personas": 1
+ },
+ "T34": {
+  "step": 220,
+  "bin": 6,
+  "sha256": "20b7a0d3f3b59dc3701a67dbaa2eedf86b70b0d2e7364827c993ed09c4b26524",
+  "question_answering": 1,
+  "perspective_shift": 3,
+  "conflict_of_perspectives": 2,
+  "reconciliation": 1,
+  "n_personas": 2
+ },
+ "T35": {
+  "step": 150,
+  "bin": 4,
+  "sha256": "01f31843ab6f36b16ee973d60460cfd8dcd2f0d62fae33c96f8c64cb0c8a2d87",
+  "question_answering": 28,
+  "perspective_shift": 27,
+  "conflict_of_perspectives": 27,
+  "reconciliation": 0,
+  "n_personas": 2
+ },
+ "T36": {
+  "step": 170,
+  "bin": 5,
+  "sha256": "a2c80da83734be5bec989047b09b631cf328f52e91167ef5ecbc2daeeed0d028",
+  "question_answering": 1,
+  "perspective_shift": 4,
+  "conflict_of_perspectives": 4,
+  "reconciliation": 1,
+  "n_personas": 2
+ },
+ "T37": {
+  "step": 120,
+  "bin": 3,
+  "sha256": "fc87069667af18d136ad41931fab5a131036d02e45341e719938230862c0906a",
+  "question_answering": 16,
+  "perspective_shift": 15,
+  "conflict_of_perspectives": 0,
+  "reconciliation": 0,
+  "n_personas": 1
+ },
+ "T38": {
+  "step": 40,
+  "bin": 1,
+  "sha256": "b11e18d4a68a121dc41425ffdc180a8ba6b85f670674f2c21d13a3dd7ada98f1",
+  "question_answering": 2,
+  "perspective_shift": 5,
+  "conflict_of_perspectives": 3,
+  "reconciliation": 1,
+  "n_personas": 1
+ },
+ "T39": {
+  "step": 230,
+  "bin": 7,
+  "sha256": "e8f90148d27a80826da3707657f9ab81fb78832dc4eca1aa263408216ddbdf87",
+  "question_answering": 22,
+  "perspective_shift": 21,
+  "conflict_of_perspectives": 20,
+  "reconciliation": 0,
+  "n_personas": 1
+ },
+ "T40": {
+  "step": 70,
+  "bin": 1,
+  "sha256": "592712369917914087f96ed2b717a394af59a59f70e3005cb3152de9fd5cd9b5",
+  "question_answering": 1,
+  "perspective_shift": 6,
+  "conflict_of_perspectives": 3,
+  "reconciliation": 1,
+  "n_personas": 1
+ },
+ "T41": {
+  "step": 70,
+  "bin": 1,
+  "sha256": "1966b36bdd3a56cd4882390d70f02d9e0c3de1885cb7cea4a2a03934b053efa7",
+  "question_answering": 1,
+  "perspective_shift": 5,
+  "conflict_of_perspectives": 3,
+  "reconciliation": 1,
+  "n_personas": 1
+ },
+ "T42": {
+  "step": 220,
+  "bin": 6,
+  "sha256": "e89a13cf80838d45d909314ea60730627763c2ae8adef0f1269d07cf59deeb37",
+  "question_answering": 3,
+  "perspective_shift": 2,
+  "conflict_of_perspectives": 0,
+  "reconciliation": 1,
+  "n_personas": 2
+ },
+ "T43": {
+  "step": 190,
+  "bin": 5,
+  "sha256": "88f3eba8682567da37a37c08099ea914eec90e37f1af4c285a21760b119e53bf",
+  "question_answering": 1,
+  "perspective_shift": 3,
+  "conflict_of_perspectives": 2,
+  "reconciliation": 1,
+  "n_personas": 2
+ },
+ "T44": {
+  "step": 150,
+  "bin": 4,
+  "sha256": "08ff55e729b4d0144a62666ad107d6d78197e2fdbd74f8f0db494886fde33d07",
+  "question_answering": 1,
+  "perspective_shift": 1,
+  "conflict_of_perspectives": 0,
+  "reconciliation": 1,
+  "n_personas": 1
+ },
+ "T45": {
+  "step": 30,
+  "bin": 0,
+  "sha256": "4efc63195af2f789a7205e1d35cb311e0e913150c92e430fc74fcabb077efdf8",
+  "question_answering": 1,
+  "perspective_shift": 1,
+  "conflict_of_perspectives": 0,
+  "reconciliation": 1,
+  "n_personas": 2
+ },
+ "T46": {
+  "step": 100,
+  "bin": 2,
+  "sha256": "40c37f52641bfd62d965dfc2fbac077cee10ef490ee80b5c95c5bd9dbefeb15e",
+  "question_answering": 4,
+  "perspective_shift": 4,
+  "conflict_of_perspectives": 3,
+  "reconciliation": 1,
+  "n_personas": 1
+ },
+ "T47": {
+  "step": 150,
+  "bin": 4,
+  "sha256": "f611be904971d0400b2e1205cf15b098a336a046423639b9624021a0087b6685",
+  "question_answering": 1,
+  "perspective_shift": 2,
+  "conflict_of_perspectives": 1,
+  "reconciliation": 1,
+  "n_personas": 1
+ },
+ "T48": {
+  "step": 230,
+  "bin": 7,
+  "sha256": "a4b75e31d0251002beca77b640d46ce364428bacd0b83ba620298d45b7576cd3",
+  "question_answering": 14,
+  "perspective_shift": 13,
+  "conflict_of_perspectives": 13,
+  "reconciliation": 1,
+  "n_personas": 2
+ },
+ "T49": {
+  "step": 220,
+  "bin": 6,
+  "sha256": "06f5cebf425ee273c3bedf982200bfcc3fa71cd92b186fd9f5e17406d314c7aa",
+  "question_answering": 1,
+  "perspective_shift": 1,
+  "conflict_of_perspectives": 0,
+  "reconciliation": 0,
+  "n_personas": 1
+ },
+ "T50": {
+  "step": 100,
+  "bin": 2,
+  "sha256": "b12b6ffc8a416bc5d5cd677436ee7b28fa979cf7978e00c9fcd8d3864985f356",
+  "question_answering": 14,
+  "perspective_shift": 13,
+  "conflict_of_perspectives": 13,
+  "reconciliation": 0,
+  "n_personas": 2
+ }
+}
