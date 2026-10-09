@@ -22,6 +22,7 @@ import hashlib
 import json
 import os
 import re
+import threading
 from pathlib import Path
 
 BEHAVIOURS = (
@@ -33,7 +34,7 @@ BEHAVIOURS = (
 
 # Bump when the prompt changes. It is part of the cache key, so an edited prompt cannot
 # silently mix two instruments inside one curve.
-PROMPT_VERSION = "v1"
+PROMPT_VERSION = "paper-v1"
 
 DEFINITIONS = {
     "question_answering":
@@ -70,9 +71,138 @@ Return ONLY a JSON object with exactly these keys and integer values:
 """
 
 
-def build_prompt(trace: str) -> str:
-    defs = "\n".join(f"- {k.replace('_', ' ')}: {v}" for k, v in DEFINITIONS.items())
-    return _TEMPLATE.format(definitions=defs, trace=trace)
+# --------------------------------------------------------------------------------------
+# The paper's prompts, verbatim (arXiv 2601.10825v1, Supplementary Methods: LLM-as-Judge
+# prompts). Wording and punctuation are theirs, including curly quotes and ellipses; line
+# breaks are reconstructed from the flattened HTML. The v1 prompt above paraphrased these
+# definitions and folded the persona count into the same call; for three months this
+# project said the instrument was unpublished. It was not. "paper-v1" is now the default.
+# --------------------------------------------------------------------------------------
+
+PAPER_BEHAVIOUR_TEMPLATE = """Your task is to analyze the following text and count how many times behaviors \
+corresponding to each of the four dimensions appear.
+
+**Text to Analyze:**
+{chain_of_thought}
+
+—
+
+You must output a single valid JSON object with the exact schema below and nothing else.
+{
+  "Question_and_Answering": <int>,
+  "Perspective_Shift": <int>,
+  "Conflict_of_Perspectives": <int>,
+  "Reconciliation": <int>
+}
+
+Use the following definitions:
+1. **Question and Answering** — A question is posed and later answered, as in conversations. \
+(e.g., "Why…? Because…", "What if…? Then…", "How do we know? Well…", "Let’s try X…? This gives us Y")
+2. **Perspective Shift** — A transition to a different idea, viewpoint, assumption, or approach, \
+as in conversations.
+3. **Conflict of Perspectives** — Expressions of disagreement, correction, or tension with another \
+perspective. (e.g., "Wait, that can’t be right…", "No, actually…", "This contradicts…")
+4. **Reconciliation** — Conflicting views are integrated or resolved into a coherent synthesis. \
+(e.g., "So perhaps both are true if…", "Combining these insights…", "This resolves the tension…")
+
+For each category, count the number of distinct times the behavior occurs in the chain of thought \
+and return the result as integers. If none are present, use 0.
+"""
+
+PAPER_PERSONA_TEMPLATE = """Your task is to analyze the following text to identify the number of distinct \
+perspectives (agents or voices). A perspective is defined as a distinct cognitive perspective or \
+reasoning role within the text.
+
+Indicators of a perspective may include:
+- Transitional markers (e.g., "however," "but," "alternatively," "wait," "let me check," "actually," "on the other hand")
+- Shifts between cognitive roles (e.g., problem setup, calculation, verification, error correction, summarization)
+- Changes in rhetorical purpose or approach
+- Corrections or reconsiderations
+- Movement between subproblems
+- Domain knowledge
+- Personality traits
+
+For each distinct perspective, you will infer its personality by answering the 10 questions of the \
+BFI-10 questionnaire as if you were that agent. You will also provide a concise profile of its \
+domain expertise.
+
+Your final output must be a single, valid JSON object and nothing else. Do not include any text or \
+explanations before or after the JSON object.
+
+**Text to Analyze:**
+{chain_of_thought}
+
+—
+
+## **Analysis Instructions**
+
+1. **Identify Perspectives:** Analyze the text to determine the number of distinct voices \
+(n_perspectives). Apply the definition above consistently, treating each identifiable shift as a \
+boundary between perspectives.
+2. **Answer Questionnaire:** For each perspective, answer the 10 BFI-10 questions below from that \
+perspective’s point of view. You must use one of these five exact strings for each answer:
+   - "Disagree strongly"
+   - "Disagree a little"
+   - "Neither agree nor disagree"
+   - "Agree a little"
+   - "Agree strongly"
+3. **Profile Expertise:** For each perspective, write a short, open-ended string describing its \
+domain expertise and cognitive function.
+
+### **BFI-10 Questionnaire**
+Rate the extent to which you, as the identified perspective, agree or disagree with the following \
+statements. I see myself as someone who…
+1. Is reserved.
+2. Is generally trusting.
+3. Tends to be lazy.
+4. Is relaxed, handles stress well.
+5. Has few artistic interests.
+6. Is outgoing, sociable.
+7. Tends to find fault with others.
+8. Does a thorough job.
+9. Gets nervous easily.
+10. Has an active imagination.
+
+—
+
+## **Required JSON Output Format**
+{
+  "n_perspectives": N,
+  "personality": [
+    ["Answer to Q1 for Perspective 1", "Answer to Q2 for Perspective 1", "…", "Answer to Q10 for Perspective 1"],
+    ["Answer to Q1 for Perspective 2", "Answer to Q2 for Perspective 2", "…", "Answer to Q10 for Perspective 2"],
+    …
+  ],
+  "domain_expertise": [
+    "Open-ended description for Perspective 1.",
+    "Open-ended description for Perspective 2.",
+    …
+  ]
+}
+"""
+
+_PAPER_KEYS = {
+    "Question_and_Answering": "question_answering",
+    "Perspective_Shift": "perspective_shift",
+    "Conflict_of_Perspectives": "conflict_of_perspectives",
+    "Reconciliation": "reconciliation",
+}
+
+
+def build_prompt(trace: str, version: str = None) -> str:
+    """The behaviour-counting prompt. Default: the paper's, verbatim."""
+    version = version or PROMPT_VERSION
+    if version == "v1":
+        defs = "\n".join(f"- {k.replace('_', ' ')}: {v}" for k, v in DEFINITIONS.items())
+        return _TEMPLATE.format(definitions=defs, trace=trace)
+    if version == "paper-v1":
+        return PAPER_BEHAVIOUR_TEMPLATE.replace("{chain_of_thought}", trace)
+    raise ValueError(f"unknown prompt version {version!r}")
+
+
+def build_persona_prompt(trace: str) -> str:
+    """The paper's persona-identification prompt (without its segmentation follow-up)."""
+    return PAPER_PERSONA_TEMPLATE.replace("{chain_of_thought}", trace)
 
 
 def _extract_json(text: str) -> str:
@@ -111,6 +241,43 @@ def parse_verdict(text: str) -> dict:
     return out
 
 
+def parse_behaviours(text: str) -> dict:
+    """Parse the paper-schema behaviour counts (v1 keys accepted too). Raises, never 0."""
+    try:
+        obj = json.loads(_extract_json(text))
+    except json.JSONDecodeError as e:
+        raise ValueError(f"judge output is not valid JSON: {e}") from e
+    if not isinstance(obj, dict):
+        raise ValueError(f"judge returned {type(obj).__name__}, not an object")
+    out = {}
+    for paper_key, ours in _PAPER_KEYS.items():
+        if paper_key in obj:
+            out[ours] = _as_count(obj[paper_key], paper_key)
+        elif ours in obj:
+            out[ours] = _as_count(obj[ours], ours)
+        else:
+            raise ValueError(f"judge omitted {paper_key!r} -- refusing to read that as 0")
+    return out
+
+
+def parse_persona(text: str) -> dict:
+    """Parse the paper-schema persona verdict: n_perspectives >= 1 with matching profiles."""
+    try:
+        obj = json.loads(_extract_json(text))
+    except json.JSONDecodeError as e:
+        raise ValueError(f"persona output is not valid JSON: {e}") from e
+    if not isinstance(obj, dict) or "n_perspectives" not in obj:
+        raise ValueError("persona judge omitted n_perspectives")
+    n = _as_count(obj["n_perspectives"], "n_perspectives")
+    if n < 1:
+        raise ValueError(f"n_perspectives must be >= 1, got {n}")
+    personality = obj.get("personality") or []
+    expertise = obj.get("domain_expertise") or []
+    if not isinstance(personality, list) or len(personality) != n:
+        raise ValueError(f"n_perspectives={n} but {len(personality)} personality profiles")
+    return {"n_personas": n, "personality": personality, "domain_expertise": expertise}
+
+
 def cache_key(trace: str, model: str, prompt_version: str = PROMPT_VERSION) -> str:
     h = hashlib.sha256()
     h.update(prompt_version.encode())
@@ -136,24 +303,36 @@ def _load_cache(path) -> dict:
     return out
 
 
-def judge_trace(trace: str, backend, cache=None, model: str = "unknown") -> dict:
+_CACHE_LOCK = threading.Lock()
+
+
+def judge_trace(trace: str, backend, cache=None, model: str = "unknown",
+                prompt_version: str = None) -> dict:
     """Judge one trace, reading through a content-addressed cache.
 
     The cache is append-only JSONL so a killed run loses at most the line in flight, and
     the key includes both the judge model and the prompt version -- mixing either inside
     one curve would make a change of instrument look like a change in the model.
+
+    "paper-v1" is two calls (the paper's behaviour prompt, then its persona prompt) merged
+    into one verdict; if either fails the trace fails and nothing is cached.
     """
-    key = cache_key(trace, model)
+    prompt_version = prompt_version or PROMPT_VERSION
+    key = cache_key(trace, model, prompt_version)
     hits = _load_cache(cache)
     if key in hits:
         return hits[key]
 
-    verdict = parse_verdict(backend(build_prompt(trace)))
+    if prompt_version == "v1":
+        verdict = parse_verdict(backend(build_prompt(trace, "v1")))
+    else:
+        verdict = parse_behaviours(backend(build_prompt(trace, prompt_version)))
+        verdict.update(parse_persona(backend(build_persona_prompt(trace))))
     if cache:
         Path(cache).parent.mkdir(parents=True, exist_ok=True)
-        with open(cache, "a") as fh:
+        with _CACHE_LOCK, open(cache, "a") as fh:
             fh.write(json.dumps({"key": key, "model": model,
-                                 "prompt_version": PROMPT_VERSION,
+                                 "prompt_version": prompt_version,
                                  "verdict": verdict}) + "\n")
     return verdict
 

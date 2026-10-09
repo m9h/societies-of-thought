@@ -37,6 +37,7 @@ def test_build_rows_are_clean_and_stepped():
     assert [r["step"] for r in rows] == [1, 1, 2]
     assert [r["idx"] for r in rows] == [0, 1, 2]
     assert "Target:" not in rows[0]["response"]
+    assert rows[0]["source"] == "train"
     assert "conversation between" not in rows[0]["response"]
     assert rows[0]["prompt"].startswith("Using the numbers [1, 2, 3]")
     assert rows[0]["words"] == len(rows[0]["response"].split())
@@ -65,9 +66,10 @@ def test_join_verdicts_by_cache_key(tmp_path):
 
 def test_write_corpus_files(tmp_path):
     rows = build_rows(LOG)
-    counts = write_corpus(tmp_path, rows, verdicts=[], prompt_text="PROMPT", card="# card")
+    counts = write_corpus(tmp_path, rows, verdicts=[], card="# card")
     assert (tmp_path / "rollouts.jsonl").exists()
     assert (tmp_path / "judgments.jsonl").exists()
-    assert (tmp_path / "judge_prompt_v1.txt").read_text() == "PROMPT"
+    assert "Question_and_Answering" in (tmp_path / "judge_prompt_behaviours.txt").read_text()
+    assert "n_perspectives" in (tmp_path / "judge_prompt_persona.txt").read_text()
     assert (tmp_path / "README.md").read_text() == "# card"
     assert counts == {"rollouts": 3, "judgments": 0}

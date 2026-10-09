@@ -5,7 +5,7 @@ configuration, with every rollout parsed and a judged subsample, is the artifact
 replicator needs. Verdicts join to rollouts by the same content hash the judge cache uses
 (`rl.judge.cache_key`), so the join is verifiable from the published files alone.
 
-    python scripts/export_fig4_corpus.py --repo mhough/sot-fig4-countdown-ppo-rollouts [--public]
+    python -m scripts.export_fig4_corpus --repo mhough/sot-fig4-countdown-ppo-rollouts [--public]
 """
 from __future__ import annotations
 
@@ -13,17 +13,21 @@ import argparse
 import hashlib
 import json
 import os
+import sys
 import tempfile
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))   # run as a script too
+
 from analysis.emergence import parse_rollouts
-from rl.judge import BEHAVIOURS, PROMPT_VERSION, build_prompt, cache_key
+from rl.judge import BEHAVIOURS, build_persona_prompt, build_prompt, cache_key
 
 
 def build_rows(log_text: str) -> list[dict]:
     rows = []
     for i, r in enumerate(parse_rollouts(log_text)):
-        rows.append({"idx": i, "step": r["step"], "prompt": r["prompt"],
+        rows.append({"idx": i, "step": r["step"], "source": r.get("source", "train"),
+                     "prompt": r["prompt"],
                      "response": r["response"], "words": len(r["response"].split()),
                      "sha256": hashlib.sha256(r["response"].encode()).hexdigest()})
     return rows
@@ -45,16 +49,18 @@ def join_verdicts(rows, cache_path, models) -> list[dict]:
     out = []
     for r in rows:
         for m in models:
-            rec = cache.get(cache_key(r["response"], m))
-            if rec is None:
-                continue
-            out.append({"idx": r["idx"], "step": r["step"], "sha256": r["sha256"],
-                        "judge_model": m, "prompt_version": rec.get("prompt_version", PROMPT_VERSION),
-                        **{k: rec["verdict"][k] for k in (*BEHAVIOURS, "n_personas")}})
+            for pv in ("paper-v1", "v1"):
+                rec = cache.get(cache_key(r["response"], m, pv))
+                if rec is None:
+                    continue
+                out.append({"idx": r["idx"], "step": r["step"], "source": r.get("source", "train"),
+                            "sha256": r["sha256"], "judge_model": m, "prompt_version": pv,
+                            **{k: rec["verdict"][k] for k in (*BEHAVIOURS, "n_personas")},
+                            "domain_expertise": rec["verdict"].get("domain_expertise")})
     return out
 
 
-def write_corpus(out_dir, rows, verdicts, prompt_text: str, card: str) -> dict:
+def write_corpus(out_dir, rows, verdicts, card: str) -> dict:
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     with (out / "rollouts.jsonl").open("w") as fh:
@@ -63,7 +69,8 @@ def write_corpus(out_dir, rows, verdicts, prompt_text: str, card: str) -> dict:
     with (out / "judgments.jsonl").open("w") as fh:
         for v in verdicts:
             fh.write(json.dumps(v) + "\n")
-    (out / f"judge_prompt_{PROMPT_VERSION}.txt").write_text(prompt_text)
+    (out / "judge_prompt_behaviours.txt").write_text(build_prompt("<TRACE>"))
+    (out / "judge_prompt_persona.txt").write_text(build_persona_prompt("<TRACE>"))
     (out / "README.md").write_text(card)
     return {"rollouts": len(rows), "judgments": len(verdicts)}
 
@@ -82,17 +89,16 @@ def main() -> None:
 
     rows = build_rows(a.log.read_text(errors="ignore"))
     verdicts = join_verdicts(rows, a.cache, a.models)
-    prompt_text = build_prompt("<TRACE>")
     per_model = {}
     for v in verdicts:
         per_model[v["judge_model"]] = per_model.get(v["judge_model"], 0) + 1
     print("rollouts:", len(rows), "judgments:", per_model)
 
     if a.local_only:
-        print(write_corpus(a.local_only, rows, verdicts, prompt_text, a.card.read_text()))
+        print(write_corpus(a.local_only, rows, verdicts, a.card.read_text()))
         return
     with tempfile.TemporaryDirectory() as td:
-        counts = write_corpus(td, rows, verdicts, prompt_text, a.card.read_text())
+        counts = write_corpus(td, rows, verdicts, a.card.read_text())
         from huggingface_hub import HfApi
         api = HfApi(token=os.environ.get("HF_TOKEN"))      # None -> local login
         api.create_repo(a.repo, repo_type="dataset", private=not a.public, exist_ok=True)

@@ -1,9 +1,9 @@
 # HANDOFF — societies-of-thought
 
-*State as of 2026-09-19. Branch `analysis/ddm-pilot`, **~16 commits ahead of `main`**.
-365 tests pass, 3 skipped (4 collect-error locally on missing torch; they run on the pod).
-RunPod balance was $234.45; **one pod is running Fig. 4 seed 0**. Read §2.5 first — it is
-the newest and most consequential result.*
+*State as of 2026-10-08. Branch `analysis/ddm-pilot`, mirrored to `main`. 422 tests pass,
+5 skipped. RunPod balance $291.02, **no pods running**. Read §C4 first: Fig. 4 is answered on
+the paper's own configuration, and the roadmap (`docs/ROADMAP.md`) now puts instrument
+validation above seeds. Literature review: `docs/literature_2026_H2.md`.*
 
 ---
 
@@ -50,37 +50,41 @@ own control (length; problem identity). `results/qwq/FINDINGS.md`,
 **Bonus finding:** QwQ per-problem accuracy is **bimodal, not binomial** — 22% of GPQA
 problems mixed where independence predicts 94%. It either knows a problem or doesn't.
 
-### C4 / Fig. 4 — emergence (**NEW, and the instrument is the story**)
+### C4 / Fig. 4 — emergence (**answered on the paper's configuration**)
 
 Triggered by a co-author's reply, which assumed our replication attempt had been Fig. 4.
 
 ⚠ **It had been — on 2026-07-23, commit `ed8d42e`** — and the finding was lost because it
 was written to the commit message and no results file, so it never reached this handoff.
-Both the roadmap and the first draft to the authors then stated we had never run C4. See
-`results/emergence/FINDINGS.md` §0. **Write results to files.**
+See `results/emergence/FINDINGS.md` §0. **Write results to files.**
 
-**From a log we already had** (`results/rl_ab/tz_train_claimA.log`: un-primed Qwen2.5-3B,
-PPO on Countdown, accuracy-only reward, 232 steps, 1,099 rollouts):
+**FINAL run** (`scripts/fig4_pod.sh`, seed 0, un-primed Qwen2.5-3B base, PPO on Countdown,
+`rollout.n=4`, batch 128, 250 steps, 2×A100, ~654 s/step, ~$143): val reward 0.104 → **0.702**.
+Complete log `results/emergence/fig4_qwen_s0_FINAL.log.gz`, 2,555 rollouts.
 
 | instrument | verdict on Fig. 4 |
 |---|---|
-| surface markers | conflict of perspectives **rises 12×** — replicates |
-| the same markers, decomposed | **99.8% of late matches are one string**, `doesn't equal` |
-| LLM judge (the paper's instrument) | `n_personas` = **1.00 in every bin**, nothing rises |
+| surface markers | conflict "rises 12×" — **RETRACTED**, 99.8% one enumeration template |
+| LLM judge, 8 bins × 32 (256 traces, 0 failures) | Q&A 0.80→0.47, shift 0.74→0.46, conflict 0.30→**0.00** (zero from step 96), **n_personas = 1.00 every bin** |
+| fine-grained steps 0–40 | no hidden early rise |
+| positive control, same judge | dialogue corpus 2.87 personas (93% >1); monologue 1.00; late-RL 1.00 |
 
-> ⚠ The 12× was **RETRACTED within the hour it was measured**. It is a numbered
-> enumeration template — `1. 89-64-6 = 21 (Doesn't equal 19) 2. ...` — not dialogue.
-> Genuinely dialogic markers all fall: *however* 77→1, *let's try another* 22→2.
-> `analysis.emergence.pattern_dominance` now reports single-string share beside any rate.
+Grand total 861 traces judged, 0 failures, every one at a single persona. Three instruments,
+three sessions, same answer. The paper is still v1 with no code.
 
-**The control is what makes the judge result quotable.** Same judge, same prompt, same
-session: the paper's own dialogue prompt's output scores **2.92 personas, >1 in 100% of
-traces**; its monologue output scores 1.00; our late-RL traces score **1.00, 0%** — a row
-indistinguishable from the monologue corpus. The judge finds personas when they are there.
+**Where the uncertainty now lives: the instrument, not the seed.** The judge is one vendor's
+models, not Gemini-2.5-Pro, and Norman et al. (2606.19544) show ICC ≈ .85 coexists with
+large judge-specific bias. Tooling added 2026-10-08 (all red-green tested):
 
-Caveats: that log is `rollout.n=1`/batch 256 (not faithful), one run, judge is Claude not
-Gemini-2.5-Pro. **The faithful run is in flight**, `scripts/fig4_pod.sh`, seeds queued.
-`results/emergence/FINDINGS.md`.
+- `analysis/cross_judge.py` — re-scores the published 256-trace sample with other judges;
+  refuses to run unless every primary verdict is cached (proves it is the same sample).
+  `rl/judge.make_backend("gemini/gemini-2.5-pro")` works the moment a key exists.
+- `analysis/judge_agreement.py` — κ (unweighted, quadratic), ICC(3,1), ρ; NaN on constants.
+- `analysis/human_annotation.py` — blind, shuffled 50-trace sheet + scorer
+  (`results/emergence/human/`). **Needs a human: fill `ratings_template.csv`.**
+- `scripts/run_status.sh` — replaces the session monitor that read step 0 and reported a
+  successful completion as FAILURE.
+- `scripts/export_fig4_corpus.py` — the corpus on HF (see §C4 results line below).
 
 ### C5 — Claim B, faithful replication (done, **n=1**)
 Qwen2.5-3B, 3 arms, 250 steps, the paper's teacher/prompts/out-of-domain pool,

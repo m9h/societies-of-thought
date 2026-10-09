@@ -63,40 +63,74 @@ def strip_log_noise(text: str) -> str:
     return _RAY.sub("", _ANSI.sub("", text))
 
 
-def parse_rollouts(text: str) -> list[dict]:
-    """Recover `{step, prompt, response}` for every logged rollout.
+_VAL_END = re.compile(r"^validation generation end")
+# TinyZero's scorer prints its verdict AFTER the solution string; it is not model output.
+_SCORER_VERDICT = re.compile(
+    r"^(?:Invalid equation|No equation found|Correct equation:|Wrong result:|Error evaluating)")
+_EOS = re.compile(r"<\|endoftext\|>|<\|im_end\|>")
 
-    A rollout starts at a `User: ` line and runs until the next `User: ` line or the next
-    `step:N` metric line. It is attributed to that following step -- the one whose gradient
-    it contributed to. Rollouts with no following step line (a run killed mid-batch) were
-    never trained on and are dropped.
+
+def _finish(cur: dict) -> dict:
+    """Cut the response at the model's end-of-text and drop the prompt's `Assistant:`."""
+    t = cur["response"]
+    m = _EOS.search(t)
+    if m:
+        t = t[:m.start()]
+    t = t.lstrip()
+    if t.startswith("Assistant:"):
+        t = t[len("Assistant:"):].lstrip()
+    cur["response"] = t
+    return cur
+
+
+def parse_rollouts(text: str) -> list[dict]:
+    """Recover `{step, source, prompt, response}` for every logged rollout.
+
+    A rollout starts at a `User: ` line and runs until the next `User: ` line, the next
+    scorer line, or the next `step:N` metric line. It is attributed to that following step
+    -- the one whose gradient it contributed to. Rollouts with no following step line (a
+    run killed mid-batch) were never trained on and are dropped.
+
+    `source` is "validation" for generations printed between verl's `validation generation
+    end` marker and the step line that carries the val score (greedy, n=1, the held-out
+    set -- what the paper's Fig. 4b judges), and "train" otherwise (temperature 1.0,
+    on-policy). The first parse mixed the two: ~20% of "training" traces were validation.
     """
     clean = strip_log_noise(text)
     out: list[dict] = []
     pending: list[dict] = []
     cur: dict | None = None
+    in_val = False
 
     for line in clean.splitlines():
         m = _STEP.match(line.strip())
         if m:
             if cur is not None:
-                pending.append(cur)
+                pending.append(_finish(cur))
                 cur = None
             step = int(m.group(1))
             for r in pending:
                 r["step"] = step
             out.extend(pending)
             pending = []
+            in_val = False
+            continue
+        if _VAL_END.match(line.strip()):
+            if cur is not None:
+                pending.append(_finish(cur))
+                cur = None
+            in_val = True
             continue
         if line.startswith("User: "):
             if cur is not None:
-                pending.append(cur)
-            cur = {"step": None, "prompt": line[len("User: "):].strip(), "response": ""}
+                pending.append(_finish(cur))
+            cur = {"step": None, "source": "validation" if in_val else "train",
+                   "prompt": line[len("User: "):].strip(), "response": ""}
             continue
         if cur is None:
             continue
-        if _SCORER_DEBUG.match(line):
-            pending.append(cur)      # the response ended; the scorer is talking now
+        if _SCORER_DEBUG.match(line) or _SCORER_VERDICT.match(line):
+            pending.append(_finish(cur))      # the response ended; the scorer is talking now
             cur = None
             continue
         if not _NOISE.match(line):

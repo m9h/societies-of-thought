@@ -41,7 +41,7 @@ def test_all_four_paper_behaviours_are_present():
 
 
 def test_prompt_carries_the_papers_definitions_verbatim():
-    p = build_prompt("some trace")
+    p = build_prompt("some trace").lower()
     assert "a question is posed and later answered" in p
     assert "a different idea, viewpoint, assumption, or approach" in p
     assert "disagreement, correction, or tension" in p
@@ -121,8 +121,8 @@ def test_judge_trace_uses_the_cache_and_does_not_call_twice(tmp_path):
         return json.dumps({b: 1 for b in BEHAVIOURS} | {"n_personas": 2})
 
     cache = tmp_path / "c.jsonl"
-    a = judge_trace("trace one", backend=fake, cache=cache, model="fake")
-    b = judge_trace("trace one", backend=fake, cache=cache, model="fake")
+    a = judge_trace(prompt_version="v1", trace="trace one", backend=fake, cache=cache, model="fake")
+    b = judge_trace(prompt_version="v1", trace="trace one", backend=fake, cache=cache, model="fake")
     assert a == b
     assert len(calls) == 1, "second identical trace must come from cache"
 
@@ -132,12 +132,12 @@ def test_cache_survives_a_new_process(tmp_path):
         return json.dumps({b: 3 for b in BEHAVIOURS} | {"n_personas": 1})
 
     cache = tmp_path / "c.jsonl"
-    judge_trace("t", backend=fake, cache=cache, model="fake")
+    judge_trace(prompt_version="v1", trace="t", backend=fake, cache=cache, model="fake")
 
     def explode(prompt: str) -> str:
         raise AssertionError("cache miss after restart -- would re-pay for every trace")
 
-    assert judge_trace("t", backend=explode, cache=cache, model="fake")["reconciliation"] == 3
+    assert judge_trace(prompt_version="v1", trace="t", backend=explode, cache=cache, model="fake")["reconciliation"] == 3
 
 
 def test_the_token_budget_is_not_tight_enough_to_truncate_the_json():

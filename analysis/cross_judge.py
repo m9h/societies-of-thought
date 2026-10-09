@@ -19,36 +19,56 @@ from pathlib import Path
 from analysis.emergence import parse_rollouts
 from analysis.judge_agreement import bin_curves, format_agreement, pairwise_agreement
 from analysis.judge_emergence import stratified_sample
-from rl.judge import _load_cache, cache_key, family_of, judge_trace, make_backend
+from rl.judge import PROMPT_VERSION, _load_cache, cache_key, family_of, judge_trace, make_backend
 
 
-def run_cross_judge(sample, backends: dict, cache, primary: str,
-                    progress=None) -> dict:
+def _row(i, r, v):
+    return {"idx": i, **{k: r[k] for k in ("step", "bin", "bin_lo", "bin_hi")},
+            "source": r.get("source", "train"),
+            "words": len(r["response"].split()), **v}
+
+
+def run_cross_judge(sample, backends: dict, cache, primary: str, progress=None,
+                    require_cached: bool = True, workers: int = 1,
+                    prompt_version: str = None) -> dict:
+    """`require_cached`: the primary judge's verdicts must all come from cache (proves the
+    sample is the published one). Set False when the prompt version is new."""
+    from concurrent.futures import ThreadPoolExecutor
     hits = _load_cache(cache)
     verdicts, failures = {}, {}
     for tag, backend in backends.items():
-        vs, fails = [], 0
-        for i, r in enumerate(sample):
-            if tag == primary:
-                key = cache_key(r["response"], tag)
+        if tag == primary and (require_cached or backend is None):
+            vs = []
+            for i, r in enumerate(sample):
+                key = cache_key(r["response"], tag, prompt_version or PROMPT_VERSION)
                 if key not in hits:
                     raise RuntimeError(
                         f"trace {i} (step {r['step']}) is not in cache for primary judge "
                         f"{tag!r}: this sample is not the published one")
-                v = hits[key]
-            else:
-                try:
-                    v = judge_trace(r["response"], backend, cache=cache, model=tag)
-                except Exception as e:                     # parse failure or transport
-                    fails += 1
-                    if progress:
-                        progress(f"  [{tag} {i}] failed: {type(e).__name__}: {str(e)[:120]}")
-                    continue
-            vs.append({"idx": i, **{k: r[k] for k in ("step", "bin", "bin_lo", "bin_hi")},
-                       "words": len(r["response"].split()), **v})
-            if progress and i % 25 == 0 and tag != primary:
+                vs.append(_row(i, r, hits[key]))
+            verdicts[tag], failures[tag] = vs, 0
+            continue
+
+        def one(i, r=None, tag=tag, backend=backend):
+            r = sample[i]
+            try:
+                v = judge_trace(r["response"], backend, cache=cache, model=tag,
+                                prompt_version=prompt_version)
+            except Exception as e:                         # parse failure or transport
+                if progress:
+                    progress(f"  [{tag} {i}] failed: {type(e).__name__}: {str(e)[:120]}")
+                return i, None
+            if progress and i % 25 == 0:
                 progress(f"  {tag}: {i}/{len(sample)}")
-        verdicts[tag], failures[tag] = vs, fails
+            return i, v
+
+        if workers > 1:
+            with ThreadPoolExecutor(max_workers=workers) as ex:
+                results = list(ex.map(one, range(len(sample))))
+        else:
+            results = [one(i) for i in range(len(sample))]
+        vs = [_row(i, sample[i], v) for i, v in results if v is not None]
+        verdicts[tag], failures[tag] = vs, sum(v is None for _, v in results)
 
     agreement = []
     tags = list(backends)
@@ -78,21 +98,36 @@ def main() -> None:
                     help="provider/model specs; bare names are Anthropic")
     ap.add_argument("--cache", type=Path, default=Path("results/emergence/judge_cache.jsonl"))
     ap.add_argument("--out", type=Path, default=Path("results/emergence/cross_judge.json"))
+    ap.add_argument("--source", default="train", choices=["train", "validation", "all"],
+                    help="which rollouts to sample (the paper's Fig. 4b judges validation)")
+    ap.add_argument("--fresh-primary", action="store_true",
+                    help="judge the primary too (new prompt version: nothing is cached)")
+    ap.add_argument("--workers", type=int, default=1)
+    ap.add_argument("--max-tokens", type=int, default=2500)
+    ap.add_argument("--prompt-version", default=PROMPT_VERSION)
     a = ap.parse_args()
 
     rollouts = parse_rollouts(a.log.read_text(errors="ignore"))
+    if a.source != "all":
+        rollouts = [r for r in rollouts if r.get("source", "train") == a.source]
     sample = stratified_sample(rollouts, a.bins, a.per_bin, seed=a.seed)
-    print(f"{len(rollouts)} rollouts -> {len(sample)} ({a.bins} x {a.per_bin}, seed {a.seed})")
+    print(f"{len(rollouts)} {a.source} rollouts -> {len(sample)} "
+          f"({a.bins} x {a.per_bin}, seed {a.seed}), prompt {a.prompt_version}")
 
-    backends = {a.primary: None}
-    for spec in a.judges:
-        call, tag, fam = make_backend(spec)
+    backends = {}
+    for spec in [a.primary, *a.judges] if a.fresh_primary else a.judges:
+        call, tag, fam = make_backend(spec, max_tokens=a.max_tokens)
         backends[tag] = call
         print(f"judge {tag} ({fam})")
+    if not a.fresh_primary:
+        backends = {a.primary: None, **backends}
 
     out = run_cross_judge(sample, backends, cache=a.cache, primary=a.primary,
-                          progress=lambda s: print(s, flush=True))
-    out.update(log=a.log.name, bins=a.bins, per_bin=a.per_bin, seed=a.seed)
+                          progress=lambda s: print(s, flush=True),
+                          require_cached=not a.fresh_primary, workers=a.workers,
+                          prompt_version=a.prompt_version)
+    out.update(log=a.log.name, bins=a.bins, per_bin=a.per_bin, seed=a.seed,
+               source=a.source, prompt_version=a.prompt_version)
 
     print("\nfailures:", out["failures"])
     print("\n" + format_agreement(out["agreement"]))

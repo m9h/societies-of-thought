@@ -53,14 +53,18 @@ Full configuration audit against the paper: `docs/paper_fidelity_audit.md` and
 
 ## Files
 
-**`rollouts.jsonl`** — one row per training rollout printed to the verl log, 2,555 rows.
+**`rollouts.jsonl`** — one row per generation printed to the verl log, 2,555 rows: 2,102
+on-policy training rollouts (temperature 1.0) and 453 held-out validation generations
+(greedy, printed at every 10th step). The paper's Fig. 4b is measured on validation
+generations, so the `source` field matters: the two series are different distributions.
 
 | field | meaning |
 |---|---|
 | `idx` | position in the log |
-| `step` | the training step whose gradient this rollout contributed to (verl prints rollouts *before* the `step:N` line that consumed them) |
+| `step` | the training step whose gradient this rollout contributed to, or the checkpoint a validation generation was sampled from (verl prints both *before* the `step:N` line) |
+| `source` | `train` (on-policy, temperature 1.0) or `validation` (greedy, held-out set) |
 | `prompt` | the Countdown prompt as shown to the policy |
-| `response` | the policy's generation, with the scorer's debug echo stripped (see below) |
+| `response` | the policy's generation, cut at its end-of-text token, with the prompt's `Assistant:` and the scorer's debug echo stripped (see below) |
 | `words` | whitespace token count of `response` |
 | `sha256` | hash of `response`, the join key for `judgments.jsonl` |
 
@@ -71,24 +75,29 @@ response that failed to parse was never written as zero.
 |---|---|
 | `idx`, `step`, `sha256` | the rollout |
 | `judge_model` | the judge that produced the row |
-| `prompt_version` | the judge prompt (`judge_prompt_v1.txt`) |
+| `prompt_version` | `paper-v1` = the paper's two prompts verbatim (`judge_prompt_behaviours.txt`, `judge_prompt_persona.txt`); `v1` = this project's earlier paraphrase, one call |
+| `source` | as in `rollouts.jsonl` |
 | `question_answering`, `perspective_shift`, `conflict_of_perspectives`, `reconciliation` | integer counts, the paper's four behaviours and definitions |
-| `n_personas` | number of distinct perspectives the judge found; 1 = a single undifferentiated voice |
+| `n_personas` | `n_perspectives` from the paper's persona prompt (under `paper-v1`), or the single-call count (under `v1`) |
+| `domain_expertise` | the paper's per-perspective expertise profiles, when the prompt produced them |
 
-**`judge_prompt_v1.txt`** — the judge prompt, verbatim, with `<TRACE>` where the trace goes.
+**`judge_prompt_behaviours.txt`, `judge_prompt_persona.txt`** — the paper's prompts
+(arXiv 2601.10825v1, Supplementary Methods: LLM-as-Judge prompts), with `<TRACE>` where the
+trace goes. Note that the persona prompt lists transitional markers ("however," "but,"
+"wait," "actually") as indicators of a perspective boundary.
 
 ## Known caveats
 
-- **Training rollouts, not evaluation generations.** These are the on-policy samples at
-  temperature 1.0 that PPO trained on. The paper does not say what its judge read.
-- **Scorer-debug stripping.** TinyZero's reward function prints `Target:` / `Extracted equation:`
-  / `Solution string:` after each response, and that echo contains the phrase "A conversation
-  between User and Assistant". It is stripped by a line-anchored rule; 78% of raw traces carried
-  it, and leaving it in biases a persona count upward.
-- **Judge identity.** The paper judges with Gemini-2.5-Pro. The verdicts here are from
-  Anthropic models; the family is recorded on every row. Agreement between judges is reported
-  in the repository's `results/emergence/cross_judge.json`, chance-corrected (κ, ICC(3,1)),
-  not exact-match.
+- **Two series.** The paper judges held-out validation generations at each checkpoint. The
+  `validation` rows here are that (greedy, ~17 per checkpoint); the `train` rows are the
+  on-policy samples PPO trained on. Our first analysis mixed them.
+- **Scorer-debug stripping.** TinyZero's reward function echoes `Target:` / `Extracted equation:`
+  / `Solution string: A conversation between User and Assistant...` before each graded response
+  and its verdict (`Invalid equation`, `No equation found`, ...) after it. Both are stripped;
+  the response is cut at `<|endoftext|>`.
+- **Judge identity.** The paper judges with Gemini-2.5-Pro. The verdicts here are from three
+  Anthropic models. Agreement between them is reported in the repository's
+  `results/emergence/cross_judge_*.json`, chance-corrected (κ, ICC(3,1)), not exact-match.
 - **One seed.**
 
 ## Headline, for orientation only

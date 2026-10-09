@@ -25,6 +25,15 @@ def _verdict(k=0):
             "conflict_of_perspectives": 0, "reconciliation": 0, "n_personas": 1}
 
 
+def _reply(prompt, k=0):
+    """A fake judge that answers both of the paper's prompts."""
+    if "n_perspectives" in prompt:
+        return json.dumps({"n_perspectives": 1, "personality": [["Agree a little"] * 10],
+                           "domain_expertise": ["arithmetic"]})
+    return json.dumps({"Question_and_Answering": k, "Perspective_Shift": 0,
+                       "Conflict_of_Perspectives": 0, "Reconciliation": 0})
+
+
 def _seed_cache(path, sample, model):
     with open(path, "w") as fh:
         for r in sample:
@@ -42,7 +51,7 @@ def test_primary_must_be_fully_cached(tmp_path):
         raise AssertionError("primary judge must not be called")
 
     with pytest.raises(RuntimeError, match="not in cache"):
-        run_cross_judge(sample, {"primary": never, "second": lambda p: json.dumps(_verdict())},
+        run_cross_judge(sample, {"primary": never, "second": _reply},
                         cache=cache, primary="primary")
 
 
@@ -54,11 +63,11 @@ def test_second_judge_is_called_and_aligned(tmp_path):
 
     def second(prompt):
         calls.append(prompt)
-        return json.dumps(_verdict(2))
+        return _reply(prompt, 2)
 
     out = run_cross_judge(sample, {"primary": None, "second": second},
                           cache=cache, primary="primary")
-    assert len(calls) == len(sample)
+    assert len(calls) == 2 * len(sample)      # behaviours + persona
     assert out["n"] == len(sample)
     assert [v["question_answering"] for v in out["verdicts"]["primary"]] == [1] * 6
     assert [v["question_answering"] for v in out["verdicts"]["second"]] == [2] * 6
@@ -78,10 +87,11 @@ def test_failures_are_counted_and_rows_dropped_pairwise(tmp_path):
     n = {"i": 0}
 
     def flaky(prompt):
-        n["i"] += 1
-        if n["i"] == 2:
-            return "I cannot annotate this."
-        return json.dumps(_verdict())
+        if "n_perspectives" in prompt:
+            n["i"] += 1
+            if n["i"] == 2:
+                return "I cannot annotate this."
+        return _reply(prompt)
 
     out = run_cross_judge(sample, {"primary": None, "flaky": flaky},
                           cache=cache, primary="primary")
@@ -90,3 +100,35 @@ def test_failures_are_counted_and_rows_dropped_pairwise(tmp_path):
     row = next(r for r in out["agreement"] if r["pair"] == ("primary", "flaky")
                and r["field"] == "question_answering")
     assert row["n"] == 5
+
+
+def test_fresh_primary_is_allowed_when_asked(tmp_path):
+    """A new prompt version has no cache; the runner must be able to judge the primary
+    fresh when told to, and must still count it as a judge in the agreement table."""
+    cache = tmp_path / "c.jsonl"
+    sample = _sample()
+
+    def j(prompt):
+        return _reply(prompt, 1)
+
+    out = run_cross_judge(sample, {"primary": j, "second": j}, cache=cache,
+                          primary="primary", require_cached=False)
+    assert len(out["verdicts"]["primary"]) == 6
+    assert out["failures"]["primary"] == 0
+
+
+def test_workers_preserve_order(tmp_path):
+    import time
+    cache = tmp_path / "c.jsonl"
+    sample = _sample(12)
+
+    def slow(prompt):
+        time.sleep(0.01 * (hash(prompt) % 5))
+        k = int(prompt.split("trace ")[1].split("\n")[0].split()[0])
+        return _reply(prompt, k)
+
+    _seed_cache(cache, sample, "primary")
+    out = run_cross_judge(sample, {"primary": None, "s": slow}, cache=cache,
+                          primary="primary", workers=4)
+    assert [v["question_answering"] for v in out["verdicts"]["s"]] == list(range(12))
+    assert [v["idx"] for v in out["verdicts"]["s"]] == list(range(12))
