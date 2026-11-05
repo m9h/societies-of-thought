@@ -1,0 +1,7 @@
+rated 50, blank 0
+pair                                        field                         n  exact  kappa kappa_q  ICC31    rho  mean_a  mean_b
+human vs judge                              question_answering           50  0.16  0.00   0.00 -0.00   nan    0.00    6.22
+human vs judge                              perspective_shift            50  0.14  0.00   0.01  0.01  0.14    0.24    8.74
+human vs judge                              conflict_of_perspectives     50  0.36  0.07   0.01  0.01  0.16    0.20    6.90
+human vs judge                              reconciliation               50  0.38  0.02   0.02  0.06  0.11    0.02    0.64
+human vs judge                              n_personas                   50  0.48 -0.19  -0.19 -0.25 -0.28    1.10    1.42

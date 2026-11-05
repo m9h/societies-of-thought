@@ -150,8 +150,12 @@ the two series are now separated and, as it happens, agree.
 
 Caveats we hold against ourselves: one seed; two judges from one vendor (no Gemini key on
 our side — a dozen Gemini-2.5-Pro verdicts on our traces would settle the judge question
-in an hour); and we have not yet run your segmentation prompt or a human rater — the
-50-trace blind sheet is built and waiting.
+in an hour); and we have not yet run your segmentation prompt or a human rater. A model
+reading the 50-trace blind sheet by your definitions' plain sense (rules fixed first,
+`results/emergence/human/CODING_RULES_fable.md`) scores conflict at 0 on every
+enumeration trace and agrees with the judge at κ ≤ 0.07 — which is why Q3 below matters
+to us more than any other. The corpus itself is public:
+https://huggingface.co/datasets/mhough/sot-fig4-countdown-ppo-rollouts.
 
 ## 5. On seeds — you're right, and here's exactly how far ours reaches
 

@@ -4,7 +4,9 @@
 > Fig. 4b/4e **reproduce** on our run: conflict and persona count rise over training under
 > two judges. Under our earlier paraphrased prompt (§4–4.9) nothing rose. The title stands,
 > but the direction of the dependence is the reverse of what §4–4.9 implied — and the
-> judge-free series in §4.10 shows what the paper's instrument is counting.
+> judge-free series in §4.10 shows what the paper's instrument is counting. §4.12: a
+> third rater reading the blind sheet by the definitions' plain sense agrees with neither
+> judge beyond chance (κ ≤ 0.07; personas κ = −0.19).
 
 *Status 2026-09-19. The faithful multi-seed run is in flight; everything below is from
 `results/rl_ab/tz_train_claimA.log` — un-primed Qwen-2.5-3B, PPO on Countdown,
@@ -479,7 +481,73 @@ Agreement on the same traces (chance-corrected beside exact match):
 
 Files: `results/emergence/cross_judge_validation.json`, `cross_judge_train.json`
 (verdicts, agreement, curves, failures), `results/emergence/human/` (50-trace blind sheet
-on the validation series, paper's definitions; **awaiting a human rater**).
+on the validation series, paper's definitions; rated once, by a non-human reader — §4.12).
+
+## 4.12 A third rater reads the sheet: the judges' conflict is not a reader's conflict (2026-10-22)
+
+The 50-trace blind sheet (`results/emergence/human/sheet.md`: validation series, equal
+quota per bin, shuffled, no step or verdict shown, the paper's definitions verbatim) was
+rated by **Claude Fable 5.1 reading the sheet in a Claude Code session** — not by the API
+prompt, and **not by a human**. The coding rules were fixed before scoring and are in
+`results/emergence/human/CODING_RULES_fable.md`; the ratings are `ratings_fable.csv`,
+the score `score_fable.txt`, the per-bin match `curves_fable.txt` / `matched_fable.json`.
+Treat it as a third rater from a different model in a different reading mode. The human
+anchor the paper reports (ICC .756) is still open.
+
+**Rules in one line each.** Q&A needs a question actually posed (no trace poses one).
+A new combination under the same brute-force strategy is not a perspective shift; an
+"Instead / However / another approach" is. A verification result on a trial never claimed
+to be right — `(not 65)`, "too high", "close but not exact" — is a check, not a conflict;
+"However, this does not equal 29", "It seems I missed something" is. The `<think>`/`<answer>`
+split is a format, not a persona. Verbatim loops count once per distinct cycle.
+
+**Agreement with the Sonnet key (n = 50):**
+
+| field | exact | κ | κ_quad | ICC(3,1) | ρ | rater mean | judge mean |
+|---|---|---|---|---|---|---|---|
+| question_answering | 0.16 | 0.00 | 0.00 | 0.00 | n/a | 0.00 | 6.22 |
+| perspective_shift | 0.14 | 0.00 | 0.01 | 0.01 | 0.14 | 0.24 | 8.74 |
+| conflict_of_perspectives | 0.36 | 0.07 | 0.01 | 0.01 | 0.16 | 0.20 | 6.90 |
+| reconciliation | 0.38 | 0.02 | 0.02 | 0.06 | 0.11 | 0.02 | 0.64 |
+| n_personas | 0.48 | −0.19 | −0.19 | −0.25 | −0.28 | 1.10 | 1.42 |
+
+Nothing agrees beyond chance, and personas agree *below* chance. Per bin, the rater's
+curve is flat at zero from bin 2 on while both judges' curves rise:
+
+| bin | n | conflict: rater / Sonnet / Haiku | share >1 persona: rater / Sonnet / Haiku |
+|---|---|---|---|
+| 0 | 6 | 0.17 / 0.17 / 0.17 | 0.17 / 0.17 / 0.67 |
+| 1 | 6 | 1.50 / 7.00 / 4.50 | 0.67 / 0.00 / 0.33 |
+| 2 | 7 | 0.00 / 16.00 / 3.00 | 0.00 / 0.43 / 0.57 |
+| 3 | 6 | 0.00 / 6.00 / 5.67 | 0.00 / 0.33 / 1.00 |
+| 4 | 7 | 0.00 / 6.71 / 0.43 | 0.00 / 0.57 / 1.00 |
+| 5 | 6 | 0.00 / 2.83 / 2.67 | 0.00 / 0.67 / 1.00 |
+| 6 | 6 | 0.00 / 5.33 / 6.00 | 0.00 / 0.67 / 1.00 |
+| 7 | 6 | 0.00 / 9.67 / 6.50 | 0.00 / 0.50 / 0.83 |
+
+**Where the three raters meet, and where they part.** The five traces the rater scored
+above zero on conflict (T05, T13, T31, T38, T40; steps 30–70) are all traces both judges
+also scored above zero — the three instruments see the same "However … Instead …", "It
+seems I missed something … Ah, I see it now" prose. They part on magnitude and on
+everything else:
+
+- On the two degenerate-loop traces the rater counts 4 and 1 distinct conflicts; Sonnet
+  counts 16 and 17, Haiku 9 and 15 — one per repeated cycle.
+- On the 45 traces the rater scored at zero conflict, Sonnet averages 6.78 conflicts and
+  Haiku 3.31. These are the enumeration traces: every `(not 65)` is a conflict to the
+  judge and a check to the reader.
+- Personas invert. The rater gives 2 personas exactly to the five traces with a corrective
+  voice; Sonnet gives all five of those **1** persona, and gives 2 personas to 50–67% of
+  the late enumeration traces the rater reads as one voice (the think/answer split, §4.10).
+  Hence κ < 0.
+
+This is the judge–human gap Norman et al. predict, made concrete: both LLM judges apply
+the paper's definitions in the way the definitions' own examples invite ("Let's try X…?
+This gives us Y"; "treat each identifiable shift as a boundary"), and a reader applying
+the same definitions' plain sense does not. Which reading the authors intend is the
+question for them (§6, Q3); which reading Gemini-2.5-Pro takes is the question a key would
+answer. What this rating cannot settle is whether a *human* reads it the way this rater
+did — the sheet is still there for one.
 
 ## 5. Limits — read before quoting
 
@@ -502,7 +570,9 @@ on the validation series, paper's definitions; **awaiting a human rater**).
   follow-up prompt is not run.
 - **Opus refusal.** One of three intended judges returned no output on the paper's
   prompt; the cross-judge result is two judges, one vendor.
-- **Human validation.** Not yet done; the sheet exists.
+- **Human validation.** Not done. §4.12 is a model reading the sheet (Fable 5.1, in-session,
+  fixed coding rules), which agrees with neither judge beyond chance; a human has still
+  not rated it.
 - **n = 13–15 per control set**; 861 traces judged across all tables, 0 failures.
 - **Countdown.** Arithmetic search by a 3B base model is the paper's own choice of task
   for this figure, but it is not where dialogue would be most expected.

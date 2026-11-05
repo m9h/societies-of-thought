@@ -1,7 +1,7 @@
 # HANDOFF — societies-of-thought
 
-*State as of 2026-10-08. Branch `analysis/ddm-pilot`, mirrored to `main`. 422 tests pass,
-5 skipped. RunPod balance $291.02, **no pods running**. Read §C4 first: Fig. 4 is answered on
+*State as of 2026-10-22. Branch `analysis/ddm-pilot`, mirrored to `main`. 441 tests pass,
+5 skipped. RunPod balance $291.02, **no pods running**. Fig. 4 corpus is public (see C4). Read §C4 first: Fig. 4 is answered on
 the paper's own configuration, and the roadmap (`docs/ROADMAP.md`) now puts instrument
 validation above seeds. Literature review: `docs/literature_2026_H2.md`.*
 
@@ -79,6 +79,11 @@ instrument is counting, judge-free: 0/255 traces contain "?", conflict = `(not 2
 the second "persona" is always the answer-presentation role, "we" goes 100% → 0%. A
 content-validity result, not a non-replication. Opus 5 refused the paper's prompt on every
 call. Cross-family judge (Gemini) still needs a key. The paper is still v1 with no code.
+**2026-10-22:** corpus is public at
+https://huggingface.co/datasets/mhough/sot-fig4-countdown-ppo-rollouts; the 50-trace blind
+sheet was rated by Fable 5.1 reading it (not a human, not the API prompt; rules in
+`results/emergence/human/CODING_RULES_fable.md`): κ ≤ 0.07 with the judge on every
+field, personas κ = −0.19, rater's conflict curve flat at 0 from bin 2 (FINDINGS §4.12).
 
 **Where the uncertainty now lives: the instrument, not the seed.** The judge is one vendor's
 models, not Gemini-2.5-Pro, and Norman et al. (2606.19544) show ICC ≈ .85 coexists with
@@ -89,13 +94,16 @@ large judge-specific bias. Tooling added 2026-10-08 (all red-green tested):
   `rl/judge.make_backend("gemini/gemini-2.5-pro")` works the moment a key exists.
 - `analysis/judge_agreement.py` — κ (unweighted, quadratic), ICC(3,1), ρ; NaN on constants.
 - `analysis/human_annotation.py` — blind, shuffled 50-trace sheet + scorer
-  (`results/emergence/human/`). **Needs a human: fill `ratings_template.csv`.**
+  (`results/emergence/human/`). Rated once by a model reader (§4.12); **still needs a human:
+  fill `ratings_template.csv`.**
 - `scripts/run_status.sh` — replaces the session monitor that read step 0 and reported a
   successful completion as FAILURE.
-- `scripts/export_fig4_corpus.py` — corpus built and verified; **public upload blocked for
-  the agent, user runs**: `python -m scripts.export_fig4_corpus --repo
-  mhough/sot-fig4-countdown-ppo-rollouts --public`.
-- `results/emergence/human/` — 50-trace blind sheet, paper's definitions, **needs a human**.
+- `scripts/export_fig4_corpus.py` — corpus **published 2026-10-22**:
+  https://huggingface.co/datasets/mhough/sot-fig4-countdown-ppo-rollouts (2,555 rollouts
+  with `source`, 1,031 paper-prompt verdicts, both prompts, card).
+- `results/emergence/human/` — 50-trace blind sheet, paper's definitions; `ratings_fable.csv`
+  + `CODING_RULES_fable.md` + `score_fable.txt` + `curves_fable.txt` are the model reading;
+  **a human rating is still open**.
 
 ### C5 — Claim B, faithful replication (done, **n=1**)
 Qwen2.5-3B, 3 arms, 250 steps, the paper's teacher/prompts/out-of-domain pool,

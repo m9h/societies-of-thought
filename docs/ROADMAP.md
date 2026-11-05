@@ -1,4 +1,4 @@
-# Roadmap — as of 2026-10-08 (status pass after Tier 0–1 execution)
+# Roadmap — as of 2026-10-22 (status pass after Tier 0–1 execution)
 
 *Grounded in `docs/literature_2026_H2.md`. Ordered by value per dollar, which is not the
 same as ordered by cost. Balance $291.02, nothing billing.*
@@ -24,10 +24,9 @@ our "exhaust" reading and hands us a judge-free test.
    verbatim-instrument result and our corrections; ready to send — the user's call.* The
    two asks that resolve things: Gemini verdicts on a dozen of our traces, and the
    expertise profiles of their step-120 personas.
-2. **Publish the corpus.** ⏳ *Built and verified locally (`python -m
-   scripts.export_fig4_corpus --repo mhough/sot-fig4-countdown-ppo-rollouts --public`;
-   2,555 rollouts with `source`, 1,031 paper-prompt verdicts, both prompts, card). The
-   public upload needs the user to run that one command.*
+2. **Publish the corpus.** ✅ Done 2026-10-22, with the user's go-ahead: the dataset
+   `sot-fig4-countdown-ppo-rollouts` is public on the Hub (2,555 rollouts with `source`,
+   1,031 paper-prompt verdicts, both prompts, card; link in README and HANDOFF).
 3. **Fold the literature into the writeup.** ✅ FINDINGS §7, note §4 addendum.
 
 ## Tier 1 — cheap, and what a reviewer asks for first
@@ -38,9 +37,12 @@ our "exhaust" reading and hands us a judge-free test.
    families still open**: no Gemini/OpenAI key here (NIM returns 403). `make_backend
    ("gemini/gemini-2.5-pro")` runs the moment `GEMINI_API_KEY` exists — Gemini-2.5-Pro is
    the paper's judge, so this is the single most valuable remaining call.
-5. **Judge–human agreement.** ⏳ Sheet built on the validation series with the paper's
-   definitions (`results/emergence/human/sheet.md`, 50 traces, blind, shuffled). **Needs a
-   person to fill `ratings_template.csv`**, then `python -m analysis.human_annotation score`.
+5. **Judge–human agreement.** ⏳ *half done.* Sheet rated 2026-10-22 by Fable 5.1 reading
+   it (not the API prompt, not a human; rules fixed first, FINDINGS §4.12): κ ≤ 0.07 with
+   the judge on all four behaviours, personas κ = −0.19, rater's conflict flat at 0 from
+   bin 2 while both judges rise. The three raters agree on *which* five traces carry a
+   corrective voice and disagree on everything else. **A human rating is still the
+   anchor**: fill `ratings_template.csv`, then `python -m analysis.human_annotation score`.
 6. **Fix the watchdog.** ✅ `scripts/run_status.sh`, 9 tests.
 
 ## Tier 2 — the strongest science left

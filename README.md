@@ -216,4 +216,5 @@ nulls are nulls *for* Hierarchic Social Entropy, and HSE has never been run agai
 LLM judge on shared inputs. If two instruments disagree about the same traces, that belongs
 alongside the three-instrument study.
 
-Datasets: [sot-priming-traces-dialogue-monologue](https://huggingface.co/datasets/mhough/sot-priming-traces-dialogue-monologue) (the corpus the paper does not ship).
+Datasets: [sot-priming-traces-dialogue-monologue](https://huggingface.co/datasets/mhough/sot-priming-traces-dialogue-monologue) (the corpus the paper does not ship);
+[sot-fig4-countdown-ppo-rollouts](https://huggingface.co/datasets/mhough/sot-fig4-countdown-ppo-rollouts) (the 2,555 Fig. 4 rollouts with the paper-prompt verdicts).
